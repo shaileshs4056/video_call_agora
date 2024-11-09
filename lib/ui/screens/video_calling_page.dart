@@ -15,7 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 const appId = "2ac013422f444292914c234d228b87bb";
 // Fill in the temporary token generated from Agora Console
 const token =
-    "007eJxTYHD+/oV7rjpP0/r8w5EnDmSULojbvTbRJiUvePKsi8HvZ61XYDBKTDYwNDYxMkozMTExsjSyNDRJNjI2STEyskiyME9KEtqqm94QyMjQfOE1CyMDBIL4PAxlmSmp+c6JOTmZeekMDACQpCMu";
+    "007eJxTYFA1PLH7RVGA4PdXaut4Cl3WnFzpXvx1ifWnSY+NeK/+kJunwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UNM1IP70hkJFhVVYmIyMDBIL4PAxlmSmp+c6JOTmZeekMDAB/cSJ3";
 // Fill in the channel name you used to generate the token
 const channel = "videoCalling";
 
@@ -38,14 +38,12 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
     super.initState();
     initAgora();
   }
+
   Future<void> initAgora() async {
-    // Request microphone and camera permissions
     await [Permission.microphone, Permission.camera].request();
 
-    // Create RtcEngine instance
     _engine = await createAgoraRtcEngine();
 
-    // Initialize RtcEngine and set the channel profile to communication mode
     await _engine.initialize(
       const RtcEngineContext(
         appId: appId,
@@ -53,7 +51,6 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
       ),
     );
 
-    // Register event handlers
     _engine.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
@@ -77,17 +74,10 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
       ),
     );
 
-    // Enable video module
     await _engine.enableVideo();
 
-    // Setup local video without mirror mode (this should be honored by supported SDK versions)
-    await _engine.setupLocalVideo(
-      VideoCanvas(
-        uid: 0, // Set to 0 to let Agora auto-assign UID
-        renderMode: RenderModeType.renderModeHidden, // Render mode to fit the view
-        mirrorMode: VideoMirrorModeType.videoMirrorModeDisabled, // Disable mirror mode
-      ),
-    );
+    // Apply mirror mode to local video
+    await _engine.setLocalVideoMirrorMode(VideoMirrorModeType.videoMirrorModeDisabled);
 
     // Start local video preview
     await _engine.startPreview();
@@ -103,74 +93,9 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
         publishMicrophoneTrack: true,
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
       ),
-      uid: 0, // Set to 0 to allow Agora to assign a unique UID
+      uid: 0,
     );
   }
-
-
-
-  // Future<void> initAgora() async {
-  //   // Get microphone and camera permissions
-  //   await [Permission.microphone, Permission.camera].request();
-  //   // Create RtcEngine instance
-  //   _engine = await createAgoraRtcEngine();
-  //   // Initialize RtcEngine and set the channel profile to live broadcasting
-  //   await _engine.initialize(const RtcEngineContext(
-  //     appId: appId,
-  //     channelProfile: ChannelProfileType.channelProfileCommunication,
-  //   ));
-  //   // Add an event handler
-  //   _engine.registerEventHandler(
-  //     RtcEngineEventHandler(
-  //       // Occurs when the local user joins the channel successfully
-  //       onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-  //         debugPrint(
-  //             'local user ' + connection.localUid.toString() + ' joined');
-  //         setState(() {
-  //           _localUserJoined = true;
-  //         });
-  //       },
-  //       // Occurs when a remote user join the channel
-  //       onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-  //         debugPrint("remote user $remoteUid joined");
-  //         setState(() {
-  //           _remoteUid = remoteUid;
-  //         });
-  //       },
-  //       // Occurs when a remote user leaves the channel
-  //       onUserOffline: (RtcConnection connection, int remoteUid,
-  //           UserOfflineReasonType reason) {
-  //         debugPrint("remote user $remoteUid left channel");
-  //         setState(() {
-  //           _remoteUid = null;
-  //         });
-  //       },
-  //     ),
-  //   );
-  //   // Enable the video module
-  //   await _engine.enableVideo();
-  //  
-  //   // Enable local video preview
-  //   await _engine.startPreview();
-  //   // Join a channel using a temporary token and channel name
-  //   await _engine.joinChannel(
-  //     token: token,
-  //     channelId: channel,
-  //     options: const ChannelMediaOptions(
-  //         // Automatically subscribe to all video streams
-  //         autoSubscribeVideo: true,
-  //         // Automatically subscribe to all audio streams
-  //         autoSubscribeAudio: true,
-  //         // Publish camera video
-  //         publishCameraTrack: true,
-  //         // Publish microphone audio
-  //         publishMicrophoneTrack: true,
-  //         // Set user role to clientRoleBroadcaster (broadcaster) or clientRoleAudience (audience)
-  //         clientRoleType: ClientRoleType.clientRoleBroadcaster),
-  //     uid:
-  //         0, // When you set uid to 0, a user name is randomly generated by the engine
-  //   );
-  // }
 
   void toggleScreenSize() {
     setState(() {
@@ -188,9 +113,14 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
         receiverUserHeight = 1.sh;
         receiverUserWidth = 1.sw;
       }
-      isHalfScreen = !isHalfScreen;
-      print(isHalfScreen); // Debugging print statement
+      isNotHalfScreen = !isNotHalfScreen;
+      // Debugging print statement
     });
+  }
+
+  ///switchCamera method
+  Future<void> switchCamera() async {
+    await _engine.switchCamera();
   }
 
 
@@ -211,7 +141,7 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
   double localUserWidth = 100.w;
   double receiverUserHeight = 1.sh;
   double receiverUserWidth = 1.sw;
-  bool isHalfScreen = true;
+  bool isNotHalfScreen = true;
   // Build the UI to display local and remote videos
   @override
   Widget build(BuildContext context) {
@@ -223,22 +153,35 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
         ),
         body: Column(
           children: [
-            isHalfScreen? Flexible(
+            isNotHalfScreen? Flexible(
               child: Stack(
                 fit: StackFit.loose,
                 children: [
+
                   Positioned(
                     bottom: 10,
                     // top: localUserHeight == 150.h?0:0.5.sh,
                     left: 0,
                     child: _remoteVideo()
                   ),
+
+                  Align(
+                    alignment: Alignment.topRight,
+                    child:
+                      _buildControlButton(
+                        onPressed: () {
+                          switchCamera();
+                        },
+                        icon: Icons.flip_camera_android,
+                        color: Colors.white,
+                      ),
+                  ).wrapPaddingOnly(right: 10.w),
                   GestureDetector(
                       onTap: () {
                         toggleScreenSize();
                       },
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20.0), // Set the desired border radius
+                      borderRadius: BorderRadius.circular(0.0), // Set the desired border radius
                       child: Align(
                         alignment: Alignment.topLeft,
                         child: SizedBox(
@@ -254,9 +197,60 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
                             )
                                 : const CircularProgressIndicator(),
                           ),
+
+                          // Align(
+                          //   alignment: Alignment.bottomCenter,
+                          //   child: Row(
+                          //     mainAxisAlignment: MainAxisAlignment.center,
+                          //     children: [
+                          //       _buildControlButton(
+                          //         onPressed: () {},
+                          //         icon: Icons.mic_off,
+                          //         color: Colors.white,
+                          //       ),
+                          //       SizedBox(width: 20),
+                          //       _buildControlButton(
+                          //         onPressed: () {},
+                          //         icon: Icons.call_end,
+                          //         color: Colors.red,
+                          //       ),
+                          //       SizedBox(width: 20),
+                          //       _buildControlButton(
+                          //         onPressed: () {},
+                          //         icon: Icons.flip_camera_android,
+                          //         color: Colors.white,
+                          //       ),
+                          //     ],
+                          //   ),
+                          // ).wrapPaddingOnly(bottom: 20.h)
                         ),
                       ),
-                    )).wrapPaddingAll(10.h)
+                    ),).wrapPaddingAll(10.h),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildControlButton(
+                            onPressed: () {},
+                            icon: Icons.mic_off,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 20),
+                          _buildControlButton(
+                            onPressed: () {},
+                            icon: Icons.call_end,
+                            color: Colors.red,
+                          ),
+                          SizedBox(width: 20),
+                          _buildControlButton(
+                            onPressed: () {},
+                            icon: Icons.flip_camera_android,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                    )
                 ],
               ),
             ):
@@ -320,7 +314,26 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
     );
   }
 
-
+  Widget _buildControlButton(
+      {required IconData icon,
+        required Color color,
+        required VoidCallback? onPressed}) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withOpacity(0.5),
+        ),
+        child: Icon(
+          icon,
+          color: color,
+          size: 32,
+        ),
+      ),
+    );
+  }
 
   // Widget to display remote video
   Widget _remoteVideo() {

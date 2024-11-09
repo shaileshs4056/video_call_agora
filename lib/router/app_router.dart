@@ -20,8 +20,9 @@ class AppRouter extends _$AppRouter {
 
   @override
   final List<AutoRoute> routes = [
+    AutoRoute(page: JoinCallRoute.page,initial: true),
     AutoRoute(page: VideoCallingRoute.page,),
-    AutoRoute(page: JoinCallRoute.page,initial: true)
+
     // AutoRoute(page: SplashRoute.page, initial: true),
     // AutoRoute(page: LoginRoute.page),
     // AutoRoute(page: SignUpRoute.page),
