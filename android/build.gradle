@@ -1,12 +1,12 @@
 buildscript {
-    ext.kotlin_version = '1.7.10'
+    ext.kotlin_version = '1.9.10' // Update to the latest stable Kotlin version
     repositories {
         google()
-        jcenter()
+        mavenCentral() // Replace jcenter() with mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.2.0'
+        classpath 'com.android.tools.build:gradle:7.2.0' // Update if needed (e.g., to 8.1.0)
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -14,7 +14,7 @@ buildscript {
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral() // Replace jcenter() with mavenCentral()
     }
 }
 
