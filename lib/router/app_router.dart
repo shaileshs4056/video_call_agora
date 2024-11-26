@@ -7,12 +7,10 @@ import 'package:flutter_demo_structure/ui/auth/sign_up/sign_up_page.dart';
 import 'package:flutter_demo_structure/ui/home/home_page.dart';
 import 'package:flutter_demo_structure/ui/screens/one_to_one_calling_page.dart';
 import 'package:flutter_demo_structure/ui/splash/splash_page.dart';
-
 import '../ui/screens/calling_page.dart';
 import '../ui/screens/index_page.dart';
-import '../ui/screens/starting_page.dart';
-
 part 'app_router.gr.dart';
+
 
 @AutoRouterConfig(
   replaceInRouteName: 'Page,Route',
@@ -27,17 +25,7 @@ class AppRouter extends _$AppRouter {
     AutoRoute(page: IndexRoute.page,initial: true),
     AutoRoute(page: CallRoute.page),
     AutoRoute(page: VideoCallingRoute.page)
-
-    // AutoRoute(page: JoinCallRoute.page,initial: true),
-    // AutoRoute(page: VideoCallingRoute.page,),
-    // AutoRoute(page: StartingRoute.page,initial: true),
-
-    // AutoRoute(page: CustomVideoCallRoute.page),
-
-    // AutoRoute(page: SplashRoute.page, initial: true),
-    // AutoRoute(page: LoginRoute.page),
-    // AutoRoute(page: SignUpRoute.page),
-    // AutoRoute(page: HomeRoute.page),
+    // AutoRoute(page: VideoCal.page)
   ];
 }
 

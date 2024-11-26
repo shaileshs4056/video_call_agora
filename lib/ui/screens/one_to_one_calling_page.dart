@@ -1,13 +1,20 @@
 import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:auto_route/annotations.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:floating/floating.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_demo_structure/ui/auth/store/auth_store.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'dart:ui';
 // Agora details
 const appId = "2ac013422f444292914c234d228b87bb";
-const token = "007eJxTYOC03x6d88HtVeuer8nzfXbcrzH4+uaB0f7tv+P5b1gG/zyuwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UZNHjmt4QyMhQlmvLysgAgSA+D0NZZkpqvnNiTk5mXjoDAwAPeSPu";
+const token = "007eJxTYDAoVeqJuy7s1TT9++cyW8fzZwJlM59u/PyqZqF8UBzDgqUKDEaJyQaGxiZGRmkmJiZGlkaWhibJRsYmKUZGFkkW5klJlkG+6Q2BjAwhtguZGBkgEMTnYSjLTEnNd07MycnMS2dgAAAbmCEb";
 const channel = "videoCalling";
 
+@RoutePage()
 class VideoCallingPage extends StatefulWidget {
   const VideoCallingPage({Key? key}) : super(key: key);
 
@@ -15,22 +22,87 @@ class VideoCallingPage extends StatefulWidget {
   _VideoCallingPageState createState() => _VideoCallingPageState();
 }
 
-class _VideoCallingPageState extends State<VideoCallingPage> {
+class _VideoCallingPageState extends State<VideoCallingPage>  with WidgetsBindingObserver {
   late RtcEngine _engine; // Agora engine instance
   bool _localUserJoined = false; // Indicates local user joined
+  final Floating floating = Floating();
   int? _remoteUid; // Remote user's UID
-  int? _selectedUserId;
   bool isVideoDisabled = false;
   bool muted = false;
   bool onSpeaker = false;
   int currentPageIndex = 0;
+  bool remoteUserVideoOff=false;
   int muteVideoRemoteId = 0;
   bool _isSplitScreen = false;
+  bool isPipEnabled = false; // Tracks if PiP is active
+  StreamSubscription<ConnectivityResult>? _subscription;
+  bool onVideoOff=false;
+
+
+  /// initState method
   @override
   void initState() {
     super.initState();
     _initAgora();
+    WidgetsBinding.instance.addObserver(this);
+    startMonitoring();
+    authStore.startMonitoring();
   }
+
+  ///dispose method
+  @override
+  void dispose() {
+    super.dispose();
+    _disposeAgora();
+    WidgetsBinding.instance.removeObserver(this);
+    authStore.stopMonitoring();
+  }
+/// didChange method
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused && !isPipEnabled) {
+      togglePipMode(); // Enable PiP when app is minimized
+    }
+  }
+
+  ///start monitoring internet connection
+
+  void startMonitoring() {
+    _subscription = Connectivity().onConnectivityChanged.listen((result) {
+      if (result == ConnectivityResult.none) {
+        // No internet connection
+        Fluttertoast.showToast(
+          msg: "Network disconnected! Check your internet connection.",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      } else {
+        // Internet connection restored
+        Fluttertoast.showToast(
+          msg: "Network reconnected!",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+        );
+      }
+    });
+  }
+
+
+  ///stop monitoring
+  /// Method to stop monitoring connectivity.
+  void stopConnectivityMonitoring() {
+  }
+
+  void togglePipMode() {
+    setState(() {
+      isPipEnabled = !isPipEnabled;
+    });
+  }
+
 
   Future<void> _initAgora() async {
     // Request microphone and camera permissions
@@ -100,9 +172,48 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
     );
   }
 
+
+  Widget _localVideoView() {
+    if (_localUserJoined) {
+      return AgoraVideoView(
+        controller: VideoViewController(
+          rtcEngine: _engine,
+          canvas: const VideoCanvas(uid: 0),
+        ),
+      );
+    } else {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+  }
   /// Info panel to show logs
 
+  Widget _remoteVideoView() {
+    if (_remoteUid != null) {
+      return AgoraVideoView(
+        controller: VideoViewController.remote(
+          rtcEngine: _engine,
+          canvas: VideoCanvas(uid: _remoteUid!),
+          connection: RtcConnection(channelId: channel),
+        ),
+      );
+    } else {
+      return const Center(
+        child: Text(
+          "Waiting for remote user to join...",
+          style: TextStyle(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+  }
   void _onCallEnd(BuildContext context) async {
+    await _engine.leaveChannel();
+    await _engine.release();
+  }
+
+  Future<void> _disposeAgora() async {
     await _engine.leaveChannel();
     await _engine.release();
   }
@@ -134,9 +245,18 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
 
   Future<void> _onDisableVideoButton() async {
     if (isVideoDisabled == true) {
-      _engine.disableVideo();
+      // _engine.disableVideo();
+      setState((){
+        isVideoDisabled=!isVideoDisabled;
+        onVideoOff=isVideoDisabled;
+      });
+
     } else {
-      _engine.enableVideo();
+      // _engine.enableVideo();
+      setState((){
+        isVideoDisabled=!isVideoDisabled;
+        onVideoOff=isVideoDisabled;
+      });
     }
   }
 
@@ -198,13 +318,11 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
           Flexible(
             child: RawMaterialButton(
               onPressed: () {
-                setState(() {
-                  isVideoDisabled=!isVideoDisabled;
-                });
                 _onDisableVideoButton();
+
               },
               child: Icon(
-                isVideoDisabled ? Icons.videocam_off : Icons.videocam,
+                onVideoOff ? Icons.videocam_off : Icons.videocam,
                 color: Colors.blueAccent,
                 size: 25.0,
               ),
@@ -238,131 +356,105 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-    _disposeAgora();
-  }
-
-  Future<void> _disposeAgora() async {
-    await _engine.leaveChannel();
-    await _engine.release();
-  }
-
-  Widget _localVideoView() {
-    if (_localUserJoined) {
-      return AgoraVideoView(
-        controller: VideoViewController(
-          rtcEngine: _engine,
-          canvas: const VideoCanvas(uid: 0),
-        ),
-      );
-    } else {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-  }
-
-  Widget _remoteVideoView() {
-    if (_remoteUid != null) {
-      return AgoraVideoView(
-        controller: VideoViewController.remote(
-          rtcEngine: _engine,
-          canvas: VideoCanvas(uid: _remoteUid!),
-          connection: RtcConnection(channelId: channel),
-        ),
-      );
-    } else {
-      return const Center(
-        child: Text(
-          "Waiting for remote user to join...",
-          style: TextStyle(color: Colors.white),
-          textAlign: TextAlign.center,
-        ),
-      );
+  Future<void> enablePip() async {
+    try {
+      final status = await floating.enable(const ImmediatePiP());
+      debugPrint("PiP status: $status");
+    } catch (e) {
+      debugPrint("Error enabling PiP: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('One-to-One Video Call'),
-      ),
-      body: Stack(
-        children: [
-          // Remote user view (background or bottom half in split screen)
-          if (_remoteUid != null)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  // Toggle split-screen mode
-                  setState(() {
-                    _isSplitScreen = !_isSplitScreen;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: _remoteUid != null
-    ? (_isSplitScreen ?EdgeInsets.only(top: MediaQuery.of(context).size.height/2):EdgeInsets.zero ):EdgeInsets.zero,
-                  // width: _remoteUid != null
-                  //     ? (_isSplitScreen ? MediaQuery.of(context).size.width : 120.0)
-                  //     : MediaQuery.of(context).size.width,
-                  // height: _remoteUid != null
-                  //     ? (_isSplitScreen
-                  //     ? MediaQuery.of(context).size.height*0.5
-                  //     : 150.0)
-                  //     : MediaQuery.of(context).size.height,
-                  child: Container(
+    return WillPopScope(
+      onWillPop: () async {
+        await enablePip();
+        return false;
+      },
+      child: SafeArea(
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
 
-                    color: Colors.grey[800],
-                    child: muteVideoRemoteId == _remoteUid && isVideoDisabled ?Container(
-                      color: Colors.black,
-                      child: Center(
-                        child: Icon(Icons.person,color: Colors.white,size: 20,),
+
+              // Remote user view (background or bottom half in split screen)
+              if (_remoteUid != null)
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () {
+                      // Toggle split-screen mode
+                      setState(() {
+                        _isSplitScreen = !_isSplitScreen;
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: _remoteUid != null
+        ? (_isSplitScreen ? EdgeInsets.only(top: MediaQuery.of(context).size.height/2):EdgeInsets.zero ):EdgeInsets.zero,
+                      child: Container(
+                        color: Colors.grey[800],
+                        child: muteVideoRemoteId == _remoteUid?Container(
+                          color: Colors.black,
+                          child: Center(
+                            child: Icon(Icons.person,color: Colors.white,size: 20,),
+                          ),
+                        ):_remoteVideoView(),
                       ),
-                    ):_remoteVideoView(),
+                    ),
+                  ),
+                ),
+
+              // Local user view (foreground or full screen if no remote user)
+              Align(
+                alignment: Alignment.topLeft,
+                child: GestureDetector(
+                  onTap: () {
+                    // Toggle split-screen mode
+                    if (_remoteUid != null) {
+                      setState(() {
+                        _isSplitScreen = !_isSplitScreen;
+                      });
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _remoteUid != null
+                        ? (_isSplitScreen ? MediaQuery.of(context).size.width : 120.0)
+                        : MediaQuery.of(context).size.width,
+                    height: _remoteUid != null
+                        ? (_isSplitScreen
+                        ? MediaQuery.of(context).size.height*0.5
+                        : 150.0)
+                        : MediaQuery.of(context).size.height,
+                    child: Container(
+                      color: Colors.grey[800],
+                      child: onVideoOff ?Container(
+                        color: Colors.black,
+                        child:Center(child: Icon(Icons.person,color: Colors.white,size: 30,)),
+                      ):_localVideoView(),
+                    ),
                   ),
                 ),
               ),
-            ),
-
-          // Local user view (foreground or full screen if no remote user)
-          Align(
-            alignment: Alignment.topLeft,
-            child: GestureDetector(
-              onTap: () {
-                // Toggle split-screen mode
-                if (_remoteUid != null) {
-                  setState(() {
-                    _isSplitScreen = !_isSplitScreen;
-                  });
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: _remoteUid != null
-                    ? (_isSplitScreen ? MediaQuery.of(context).size.width : 120.0)
-                    : MediaQuery.of(context).size.width,
-                height: _remoteUid != null
-                    ? (_isSplitScreen
-                    ? MediaQuery.of(context).size.height*0.5
-                    : 150.0)
-                    : MediaQuery.of(context).size.height,
-                child: Container(
-                  color: Colors.grey[800],
-                  child: muteVideoRemoteId == 0 && isVideoDisabled?Container(
-                    color: Colors.black,
-                    child:Center(child: Icon(Icons.person,color: Colors.white,size: 30,)),
-                  ):_localVideoView(),
+              _toolbar(),
+              Observer(
+                builder: (_) => Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    color: Colors.black.withOpacity(0.5),
+                    child: Text(
+                      "Network Status: ${authStore.networkStatus}",
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-          _toolbar()
-        ],
+        ),
       ),
     );
   }

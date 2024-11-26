@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 
 import 'package:flutter/material.dart';
@@ -26,6 +29,7 @@ part 'auth_store.g.dart';
 class AuthStore = _AuthStoreBase with _$AuthStore;
 
 abstract class _AuthStoreBase with Store {
+  late StreamSubscription<ConnectivityResult> _subscription;
   @observable
   BaseResponse<UserData?>? loginResponse;
 
@@ -34,6 +38,10 @@ abstract class _AuthStoreBase with Store {
 
   @observable
   String? errorMessage;
+
+  // Observable for connection status
+  @observable
+  String networkStatus = "Connected";
 
   final GoogleSignIn googleSignIn = GoogleSignIn();
 
@@ -57,6 +65,38 @@ abstract class _AuthStoreBase with Store {
       debugPrintStack(stackTrace: st);
       errorMessage = e.toString();
     }
+  }
+
+  // Initialize connectivity monitoring
+  @action
+  void startMonitoring() {
+    _subscription = Connectivity().onConnectivityChanged.listen((result) {
+      switch (result) {
+        case ConnectivityResult.none:
+          updateNetworkStatus("Disconnected");
+          break;
+        case ConnectivityResult.mobile:
+          updateNetworkStatus("Mobile Data");
+          break;
+        case ConnectivityResult.wifi:
+          updateNetworkStatus("Wi-Fi");
+          break;
+        default:
+          updateNetworkStatus("Unknown");
+      }
+    });
+  }
+
+  // Stop connectivity monitoring
+  @action
+  void stopMonitoring() {
+    _subscription.cancel();
+  }
+
+  // Update network status
+  @action
+  void updateNetworkStatus(String status) {
+    networkStatus = status;
   }
 
   @action
