@@ -8,30 +8,38 @@ import 'package:flutter_demo_structure/values/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 const String appID = '2ac013422f444292914c234d228b87bb'; // Your Agora App ID
-const String token = "007eJxTYNjWHHLFbv6rlTEPzFuTbuW/qHV+8Puh2Ic8Eya76QzpzWsVGIwSkw0MjU2MjNJMTEyMLI0sDU2SjYxNUoyMLJIszJOSeqc5pjcEMjK8/Z7LysgAgSA+D0NZZkpqvnNiTk5mXjoDAwDIrSPF"; // Your Agora Token
+const String token = "007eJxTYOC03x6d88HtVeuer8nzfXbcrzH4+uaB0f7tv+P5b1gG/zyuwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UZNHjmt4QyMhQlmvLysgAgSA+D0NZZkpqvnNiTk5mXjoDAwAPeSPu"; // Your Agora Token
 
 @RoutePage()
 class CallPage extends StatefulWidget {
   /// non-modifiable channel name of the page
   final String? channelName;
 
+  String? name;
+
   /// non-modifiable client role of the page
   final ClientRoleType? role;
 
   /// Creates a call page with given channel name.
-  const CallPage({Key? key, this.channelName, this.role}) : super(key: key);
+  CallPage({Key? key, this.channelName, this.name, this.role})
+      : super(key: key);
 
   @override
   _CallPageState createState() => _CallPageState();
 }
 
-class _CallPageState extends State<CallPage> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+class _CallPageState extends State<CallPage>
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final _users = <int>[];
   final _infoStrings = <String>[];
+  int? _selectedUserId;
+  bool isVideoDisabled = false;
   bool muted = false;
+  bool onSpeaker = false;
   late RtcEngine _engine;
   late final PageController pageController;
   int currentPageIndex = 0;
+  int muteVideoRemoteId = 0;
 
   @override
   void dispose() {
@@ -100,7 +108,7 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
   void _addAgoraEventHandlers() {
     _engine.registerEventHandler(RtcEngineEventHandler(
       onError: (err, msg) {
-        (code) {
+            (code) {
           setState(() {
             final info = 'onError: $code';
             _infoStrings.add(info);
@@ -140,95 +148,118 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
           _infoStrings.add(info);
         });
       },
+      onUserMuteVideo: (connection, remoteUid, muted) {
+        setState(() {
+          if (muted) {
+            isVideoDisabled = muted;
+            print("User with remoteUid $remoteUid has disabled their video.");
+            muteVideoRemoteId = remoteUid;
+            // Handle the case when video is disabled
+          } else {
+            isVideoDisabled = muted;
+            print("User with remoteUid $remoteUid has enabled their video.");
+            // Handle the case when video is enabled
+          }
+        });
+      },
     ));
   }
-
-  // /// Helper function to get list of native views
-  // List<Widget> _getRenderViews() {
-  //   final List<StatefulWidget> list = [];
-  //   if (widget.role == ClientRoleType.clientRoleBroadcaster) {
-  //     list.add(RtcLocalView.SurfaceView());
-  //   }
-  //   _users.forEach((int uid) => list.add(
-  //       RtcRemoteView.SurfaceView(channelId: widget.channelName!, uid: uid)));
-  //   return list;
-  // }
-
   // Helper function to get list of native views
   List<Widget> _getRenderViewsForPageOne() {
     final List<Widget> list = [];
-
     // Local view
     list.add(
-      Container(
-        color: AppColor.red,
-        child: AgoraVideoView(
-          controller: VideoViewController(
-            rtcEngine: _engine,
-            canvas: VideoCanvas(uid: 0), // 0 for the local user
+      GestureDetector(
+        onDoubleTap: () {
+          setState(() {
+            _selectedUserId = 0;
+          });
+        },
+        child: isVideoDisabled
+            ? Container(
+          color: Colors.black,
+          child: Center(
+            child: Icon(Icons.person, color: Colors.white, size: 50.0),
+          ),
+        )
+            : Container(
+          color: AppColor.red,
+          child: AgoraVideoView(
+            controller: VideoViewController(
+              rtcEngine: _engine,
+              canvas: VideoCanvas(uid: 0), // 0 for the local user
+            ),
           ),
         ),
       ),
     );
 
     // Remote views for each user in _users list
-    if(_users.isNotEmpty)
-    _users.take(min(_users.length, 5)).forEach((int uid) {
-      print("uid is $uid");
-      list.add(
-        Container(
-          color: AppColor.green,
-          child: AgoraVideoView(
-            key: Key(uid.toString()),
-            controller: VideoViewController.remote(
-              rtcEngine: _engine,
-              canvas: VideoCanvas(uid: uid),
-              connection: RtcConnection(channelId: "videoCalling"),
+    if (_users.isNotEmpty)
+      _users.take(min(_users.length, 5)).forEach((int uid) {
+        print("uid is $uid");
+        list.add(
+          GestureDetector(
+            onDoubleTap: () {
+              setState(() {
+                _selectedUserId = uid;
+              });
+            },
+            child: muteVideoRemoteId == uid
+                ? Container(
+              color: Colors.black,
+              child: Center(
+                child:
+                Icon(Icons.person, color: Colors.white, size: 50.0),
+              ),
+            )
+                : Container(
+              color: AppColor.green,
+              child: AgoraVideoView(
+                key: Key(uid.toString()),
+                controller: VideoViewController.remote(
+                  rtcEngine: _engine,
+                  canvas: VideoCanvas(uid: uid),
+                  connection: RtcConnection(channelId: "videoCalling"),
+                ),
+              ),
             ),
           ),
-        ),
-      );
-    });
+        );
+      });
 
     return list;
   }
 
   List<Widget> _getRenderViewsForPageTwo() {
     final List<Widget> list = [];
-
-    /*// Local view
-    list.add(
-      Container(
-        color: AppColor.red,
-        child: AgoraVideoView(
-          controller: VideoViewController(
-            rtcEngine: _engine,
-            canvas: VideoCanvas(uid: 0), // 0 for the local user
-          ),
-        ),
-      ),
-    );*/
-
     // Remote views for each user in _users list
-    if(_users.length>5)
-    _users.sublist(5,_users.length).forEach((int uid) {
-
-      list.add(
-        Container(
-          color: AppColor.green,
-          child: AgoraVideoView(
-            key: Key(uid.toString()),
-            controller: VideoViewController.remote(
-              rtcEngine: _engine,
-              canvas: VideoCanvas(uid: uid),
-              connection: RtcConnection(channelId: "videoCalling"),
+    if (_users.length > 5)
+      _users.sublist(5, _users.length).forEach((int uid) {
+        list.add(
+          Container(
+            color: AppColor.green,
+            child: AgoraVideoView(
+              key: Key(uid.toString()),
+              controller: VideoViewController.remote(
+                rtcEngine: _engine,
+                canvas: VideoCanvas(uid: uid),
+                connection: RtcConnection(channelId: "videoCalling"),
+              ),
             ),
           ),
-        ),
-      );
-    });
+        );
+      });
 
     return list;
+  }
+
+  Future<void> _onDisableVideoButton() async {
+    if (isVideoDisabled == true) {
+      _engine.disableVideo();
+    } else {
+      _engine.enableVideo();
+    }
   }
 
   /// Video view wrapper
@@ -331,7 +362,6 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
               ],
             ));
 
-
       case 7:
         return Container(
           child: Column(
@@ -392,47 +422,91 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          RawMaterialButton(
-            onPressed: () {
-              _onToggleMute();
-            },
-            child: Icon(
-              muted ? Icons.mic_off : Icons.mic,
-              color: muted ? Colors.white : Colors.blueAccent,
-              size: 20.0,
+          Flexible(
+            child: RawMaterialButton(
+              onPressed: () {
+                _onToggleMute();
+              },
+              child: Icon(
+                muted ? Icons.mic_off : Icons.mic,
+                color: muted ? Colors.white : Colors.blueAccent,
+                size: 20.0,
+              ),
+              shape: CircleBorder(),
+              elevation: 2.0,
+              fillColor: muted ? Colors.blueAccent : Colors.white,
+              padding: const EdgeInsets.all(12.0),
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: muted ? Colors.blueAccent : Colors.white,
-            padding: const EdgeInsets.all(12.0),
           ),
-          RawMaterialButton(
-            onPressed: () {
-              _onCallEnd(context);
-              Navigator.pop(context);
-            },
-            child: Icon(
-              Icons.call_end,
-              color: Colors.white,
-              size: 35.0,
+          Flexible(
+            child: RawMaterialButton(
+              onPressed: () {
+                _onCallEnd(context);
+                Navigator.pop(context);
+              },
+              child: Icon(
+                Icons.call_end,
+                color: Colors.white,
+                size: 35.0,
+              ),
+              shape: CircleBorder(),
+              elevation: 2.0,
+              fillColor: Colors.redAccent,
+              padding: const EdgeInsets.all(15.0),
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: Colors.redAccent,
-            padding: const EdgeInsets.all(15.0),
           ),
-          RawMaterialButton(
-            onPressed: _onSwitchCamera,
-            child: Icon(
-              Icons.switch_camera,
-              color: Colors.blueAccent,
-              size: 20.0,
+          Flexible(
+            child: RawMaterialButton(
+              onPressed: _onSwitchCamera,
+              child: Icon(
+                Icons.switch_camera,
+                color: Colors.blueAccent,
+                size: 20.0,
+              ),
+              shape: CircleBorder(),
+              elevation: 2.0,
+              fillColor: Colors.white,
+              padding: const EdgeInsets.all(12.0),
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: Colors.white,
-            padding: const EdgeInsets.all(12.0),
-          )
+          ),
+          Flexible(
+            child: RawMaterialButton(
+              onPressed: () {
+                setState(() {
+                  isVideoDisabled=!isVideoDisabled;
+                });
+                _onDisableVideoButton();
+              },
+              child: Icon(
+                isVideoDisabled ? Icons.videocam_off : Icons.videocam,
+                color: Colors.blueAccent,
+                size: 25.0,
+              ),
+              shape: CircleBorder(),
+              elevation: 2.0,
+              fillColor: Colors.white,
+              padding: const EdgeInsets.all(12.0),
+            ),
+          ),
+          Flexible(
+            child: RawMaterialButton(
+              onPressed: () {
+                setState(() {
+                  onSpeaker = !onSpeaker;
+                });
+                _onSpeakerButton();
+              },
+              child: Icon(
+                onSpeaker ? Icons.volume_off : Icons.volume_up,
+                color: Colors.blueAccent,
+                size: 25.0,
+              ),
+              shape: CircleBorder(),
+              elevation: 2.0,
+              fillColor: Colors.white,
+              padding: const EdgeInsets.all(12.0),
+            ),
+          ),
         ],
       ),
     );
@@ -444,6 +518,7 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
     await _engine.leaveChannel();
     await _engine.release();
   }
+
   void _onToggleMute() {
     setState(() {
       muted = !muted;
@@ -452,6 +527,16 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
     if (muted == true) {
       // toastMessageTxt("Audio is muted of user id is ${_users[0]}");
     }
+  }
+
+  void _onSpeakerButton() {
+    setState(() {
+      if (onSpeaker == true) {
+        _engine.disableAudio();
+      } else {
+        _engine.enableAudio();
+      }
+    });
   }
 
   void _onSwitchCamera() {
@@ -485,12 +570,75 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
                 },
                 scrollDirection: Axis.horizontal,
                 children: [
+                  if (_selectedUserId != null)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onDoubleTap: () {
+                          setState(() {
+                            _selectedUserId =
+                            null; // Reset the selected view on double-tap
+                          });
+                        },
+                        child: Stack(
+                          children: [
+                            // Background: Fullscreen video for the selected user
+                            Center(
+                              child: AgoraVideoView(
+                                controller: _selectedUserId == 0
+                                    ? VideoViewController(
+                                  rtcEngine: _engine,
+                                  canvas: VideoCanvas(uid: 0),
+                                )
+                                    : VideoViewController.remote(
+                                  rtcEngine: _engine,
+                                  canvas:
+                                  VideoCanvas(uid: _selectedUserId!),
+                                  connection: RtcConnection(
+                                      channelId: "videoCalling"),
+                                ),
+                              ),
+                            ),
+
+                            // Local view: Small video window positioned in the top-left corner
+                            Positioned(
+                              top: 16, // Adjust for padding
+                              left: 16, // Adjust for padding
+                              child: GestureDetector(
+                                  onDoubleTap: () {
+                                    setState(() {
+                                      _selectedUserId =
+                                      0; // Switch to local user view on tap
+                                    });
+                                  },
+                                  child: _selectedUserId == 0
+                                      ? SizedBox.shrink()
+                                      : Container(
+                                    width: 200,
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                      borderRadius:
+                                      BorderRadius.circular(8),
+                                      color: Colors.black,
+                                    ),
+                                    child: AgoraVideoView(
+                                      controller: VideoViewController(
+                                        rtcEngine: _engine,
+                                        canvas: VideoCanvas(uid: 0),
+                                      ),
+                                    ),
+                                  )),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   _viewRows(),
                   _viewSecondRows(),
 
                   // _viewRows(),
                   // viewRowsFirstPage(),
-
                 ],
                 controller: pageController,
               ),
@@ -500,45 +648,45 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
             _toolbar(),
             _users.length >= 1
                 ? Positioned(
-                    top: MediaQuery.of(context).size.height /
-                        1.55, // Adjust this value to position the PageView indicator
-                    left: 0,
-                    right: 0,
-                    child: SizedBox(
-                      height: 100,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          2,
-                          (index) {
-                            return GestureDetector(
-                              onTap: () {
-                                pageController.animateToPage(
-                                  index,
-                                  duration: Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                                print("select index is ${index}");
-                              },
-                              child: Container(
-                                margin: EdgeInsets.all(5),
-                                height: 10.h,
-                                width: 10.w,
-                                decoration: BoxDecoration(
-                                  color: currentPageIndex == index
-                                      ? Colors.blue
-                                      : AppColor.greyTealColor,
-                                  shape: BoxShape.circle,
-                                  border:
-                                      Border.all(color: Colors.white, width: 2),
-                                ),
-                              ),
-                            );
-                          },
+              top: MediaQuery.of(context).size.height /
+                  1.55, // Adjust this value to position the PageView indicator
+              left: 0,
+              right: 0,
+              child: SizedBox(
+                height: 100,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    2,
+                        (index) {
+                      return GestureDetector(
+                        onTap: () {
+                          pageController.animateToPage(
+                            index,
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                          print("select index is ${index}");
+                        },
+                        child: Container(
+                          margin: EdgeInsets.all(5),
+                          height: 10.h,
+                          width: 10.w,
+                          decoration: BoxDecoration(
+                            color: currentPageIndex == index
+                                ? Colors.blue
+                                : AppColor.greyTealColor,
+                            shape: BoxShape.circle,
+                            border:
+                            Border.all(color: Colors.white, width: 2),
+                          ),
                         ),
-                      ),
-                    ),
-                  )
+                      );
+                    },
+                  ),
+                ),
+              ),
+            )
                 : SizedBox.shrink(),
           ],
         ),
@@ -550,3 +698,4 @@ class _CallPageState extends State<CallPage> with TickerProviderStateMixin, Auto
   // TODO: implement wantKeepAlive
   bool get wantKeepAlive => true;
 }
+

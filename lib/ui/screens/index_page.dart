@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_demo_structure/router/app_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'calling_page.dart';
@@ -83,7 +84,27 @@ class IndexState extends State<IndexPage> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: onJoin,
-                        child: Text('Join'),
+                        child: Text('Join group call'),
+                        style: ButtonStyle(
+                            backgroundColor:
+                            MaterialStateProperty.all(Colors.blueAccent),
+                            foregroundColor:
+                            MaterialStateProperty.all(Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          appRouter.push(VideoCallingRoute());
+                        },
+                        child: Text('Join one to one'),
                         style: ButtonStyle(
                             backgroundColor:
                             MaterialStateProperty.all(Colors.blueAccent),
