@@ -19,7 +19,6 @@ class _VideoCallingPageState extends State<VideoCallingPage> {
   late RtcEngine _engine; // Agora engine instance
   bool _localUserJoined = false; // Indicates local user joined
   int? _remoteUid; // Remote user's UID
-  int? _selectedUserId;
   bool isVideoDisabled = false;
   bool muted = false;
   bool onSpeaker = false;
