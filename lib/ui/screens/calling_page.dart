@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:auto_route/annotations.dart';
@@ -42,6 +44,10 @@ class _CallPageState extends State<CallPage>
   late final PageController pageController;
   int currentPageIndex = 0;
   int muteVideoRemoteId = 0;
+  final Map<int, bool> userVideoStates = {}; // Store video states for all users.
+  bool isLocalVideoDisabled = false;
+  int myUid = 0; // Replace with actual user ID.
+  int? _streamId;
 
   @override
   void dispose() {
@@ -154,106 +160,166 @@ class _CallPageState extends State<CallPage>
       },
       onUserMuteVideo: (connection, remoteUid, muted) {
         setState(() {
-          if (muted) {
-            isVideoDisabled = muted;
-            print("User with remoteUid $remoteUid has disabled their video.");
-            muteVideoRemoteId = remoteUid;
-            // Handle the case when video is disabled
-          } else {
-            isVideoDisabled = muted;
-            print("User with remoteUid $remoteUid has enabled their video.");
-            // Handle the case when video is enabled
-          }
+          userVideoStates[remoteUid] = muted;
         });
+      },
+      onStreamMessage: (RtcConnection connection, int remoteUid, int streamId, Uint8List data, int length, int sentTs) {
+        try {
+          // Decode the received data into a string
+          String message = String.fromCharCodes(data);
+
+          // Parse the JSON message
+          final decodedMessage = jsonDecode(message);
+
+          if (decodedMessage["uid"] != null && decodedMessage["videoMuted"] != null) {
+            setState(() {
+              userVideoStates[decodedMessage["uid"]] = decodedMessage["videoMuted"];
+            });
+          }
+        } catch (e) {
+          print("Error handling stream message: $e");
+        }
+      },
+      onStreamMessageError: (RtcConnection connection, int remoteUid, int streamId, ErrorCodeType error, int missed, int cached) {
+        print("Stream message error: $error");
       },
     ));
   }
+
+
+  void toggleLocalVideo() {
+    setState(() {
+      userVideoStates[0] = !(userVideoStates[0] ?? false); // Toggle local video state.
+    });
+
+    // Mute or unmute the local video stream
+    _engine.muteLocalVideoStream(userVideoStates[0] ?? false);
+
+    // Broadcast the local video state to remote users
+    if (_streamId != null) {
+      try {
+        // Create the message data
+        String message = jsonEncode({
+          "uid": 0, // Local user ID
+          "videoMuted": userVideoStates[0], // Video muted state
+        });
+
+        // Convert the message to Uint8List
+        Uint8List messageData = Uint8List.fromList(message.codeUnits);
+
+        // Calculate the length of the message
+        int length = messageData.length;
+
+        // Send the message with the calculated length
+        _engine.sendStreamMessage(
+          streamId: _streamId!,
+          data: messageData,
+          length: length, // Specify the length here
+        );
+      } catch (e) {
+        print("Error sending stream message: $e");
+      }
+    }
+  }
+
   // Helper function to get list of native views
   List<Widget> _getRenderViewsForPageOne() {
     final List<Widget> list = [];
-    // Local view
+
+    // Add local user view
     list.add(
       GestureDetector(
         onDoubleTap: () {
           setState(() {
-            _selectedUserId = 0;
+            _selectedUserId = 0; // Select local user
           });
         },
-        child: isVideoDisabled
+        child: (userVideoStates[0] ?? false) // Check if local video is muted
             ? Container(
           color: Colors.black,
           child: Center(
             child: Icon(Icons.person, color: Colors.white, size: 50.0),
           ),
         )
-            : Container(
-          color: AppColor.red,
-          child: AgoraVideoView(
-            controller: VideoViewController(
-              rtcEngine: _engine,
-              canvas: VideoCanvas(uid: 0), // 0 for the local user
-            ),
+            : AgoraVideoView(
+          controller: VideoViewController(
+            rtcEngine: _engine,
+            canvas: VideoCanvas(uid: 0), // Local user's video canvas
           ),
         ),
       ),
     );
 
-    // Remote views for each user in _users list
-    if (_users.isNotEmpty)
-      _users.take(min(_users.length, 5)).forEach((int uid) {
-        print("uid is $uid");
+    // Add remote user views
+    for (var uid in _users.take(min(_users.length, 5))) {
+      list.add(
+        GestureDetector(
+          onDoubleTap: () {
+            setState(() {
+              _selectedUserId = uid; // Select remote user
+            });
+          },
+          child: (userVideoStates[uid] ?? false) // Check if remote video is muted
+              ? Container(
+            color: Colors.black,
+            child: Center(
+              child: Icon(Icons.person, color: Colors.white, size: 50.0),
+            ),
+          )
+              : AgoraVideoView(
+            key: Key(uid.toString()), // Unique key for each remote view
+            controller: VideoViewController.remote(
+              rtcEngine: _engine,
+              canvas: VideoCanvas(uid: uid), // Remote user's video canvas
+              connection: RtcConnection(channelId: "videoCalling"),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return list;
+  }
+
+
+  List<Widget> _getRenderViewsForPageTwo() {
+    final List<Widget> list = [];
+
+    // Check if there are users beyond the first 5
+    if (_users.length > 5) {
+      // Iterate through users starting from index 5
+      _users.sublist(5, _users.length).forEach((int uid) {
         list.add(
           GestureDetector(
-            onDoubleTap: () {
+            onTap: () {
+              // Toggle video on/off for the user
               setState(() {
-                _selectedUserId = uid;
+                userVideoStates[uid] = !(userVideoStates[uid] ?? true);
               });
             },
-            child: muteVideoRemoteId == uid
-                ? Container(
-              color: Colors.black,
-              child: Center(
-                child:
-                Icon(Icons.person, color: Colors.white, size: 50.0),
-              ),
-            )
-                : Container(
+            child: Container(
               color: AppColor.green,
-              child: AgoraVideoView(
+              child: userVideoStates[uid] ?? true // Check if video is ON
+                  ? AgoraVideoView(
                 key: Key(uid.toString()),
                 controller: VideoViewController.remote(
                   rtcEngine: _engine,
                   canvas: VideoCanvas(uid: uid),
                   connection: RtcConnection(channelId: "videoCalling"),
                 ),
+              )
+                  : Center(
+                child: Icon(
+                  Icons.videocam_off,
+                  color: Colors.red,
+                  size: 50,
+                ),
               ),
             ),
           ),
         );
       });
-
-    return list;
-  }
-
-  List<Widget> _getRenderViewsForPageTwo() {
-    final List<Widget> list = [];
-    // Remote views for each user in _users list
-    if (_users.length > 5)
-      _users.sublist(5, _users.length).forEach((int uid) {
-        list.add(
-          Container(
-            color: AppColor.green,
-            child: AgoraVideoView(
-              key: Key(uid.toString()),
-              controller: VideoViewController.remote(
-                rtcEngine: _engine,
-                canvas: VideoCanvas(uid: uid),
-                connection: RtcConnection(channelId: "videoCalling"),
-              ),
-            ),
-          ),
-        );
-      });
+    }
 
     return list;
   }
@@ -475,16 +541,14 @@ class _CallPageState extends State<CallPage>
           ),
           Flexible(
             child: RawMaterialButton(
-              onPressed: () {
-                setState(() {
-                  isVideoDisabled=!isVideoDisabled;
-                });
-                _onDisableVideoButton();
-              },
+              onPressed: toggleLocalVideo,
               child: Icon(
-                isVideoDisabled ? Icons.videocam_off : Icons.videocam,
-                color: Colors.blueAccent,
-                size: 25.0,
+                userVideoStates[0] == true
+                    ? Icons.videocam_off
+                    : Icons.videocam,
+                color: userVideoStates[0] == true
+                    ? Colors.red
+                    : Colors.blueAccent,
               ),
               shape: CircleBorder(),
               elevation: 2.0,
