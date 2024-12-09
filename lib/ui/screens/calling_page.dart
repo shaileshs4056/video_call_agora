@@ -3,12 +3,13 @@ import 'dart:math';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:auto_route/annotations.dart';
+import 'package:floating/floating.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_demo_structure/values/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 const String appID = '2ac013422f444292914c234d228b87bb'; // Your Agora App ID
-const String token = "007eJxTYOC03x6d88HtVeuer8nzfXbcrzH4+uaB0f7tv+P5b1gG/zyuwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UZNHjmt4QyMhQlmvLysgAgSA+D0NZZkpqvnNiTk5mXjoDAwAPeSPu"; // Your Agora Token
+const String token = "007eJxTYGhvSKzduOytwtOOJy9vMOfwXamMK16z8t6CjcumnFrQ8KRAgcEoMdnA0NjEyCjNxMTEyNLI0tAk2cjYJMXIyCLJwjwpaX1zWHpDICNDqOhSVkYGCATxeRjKMlNS850Tc3Iy89IZGABCECSr"; // Your Agora Token
 
 @RoutePage()
 class CallPage extends StatefulWidget {
@@ -29,9 +30,10 @@ class CallPage extends StatefulWidget {
 }
 
 class _CallPageState extends State<CallPage>
-    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _users = <int>[];
   final _infoStrings = <String>[];
+  final Floating floating = Floating();
   int? _selectedUserId;
   bool isVideoDisabled = false;
   bool muted = false;
@@ -61,6 +63,8 @@ class _CallPageState extends State<CallPage>
     super.initState();
     // initialize agora sdk
     initialize();
+    WidgetsBinding.instance.addObserver(this);
+
     pageController = PageController(
       initialPage: 0,
     );
@@ -543,152 +547,167 @@ class _CallPageState extends State<CallPage>
     _engine.switchCamera();
   }
 
+  Future<void> enablePip() async {
+    try {
+      final status = await floating.enable(const ImmediatePiP());
+      debugPrint("PiP status: $status");
+    } catch (e) {
+      debugPrint("Error enabling PiP: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Agora Flutter'),
-      ),
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Stack(
-          children: <Widget>[
-            Positioned.fill(
-              child: PageView(
-                padEnds: false,
-                reverse: false,
-                physics: BouncingScrollPhysics(),
-                onPageChanged: (value) {
-                  setState(() {
-                    currentPageIndex = value;
-                  });
-                  pageController.animateToPage(
-                    value,
-                    duration: Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                scrollDirection: Axis.horizontal,
-                children: [
-                  if (_selectedUserId != null)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onDoubleTap: () {
-                          setState(() {
-                            _selectedUserId =
-                            null; // Reset the selected view on double-tap
-                          });
-                        },
-                        child: Stack(
-                          children: [
-                            // Background: Fullscreen video for the selected user
-                            Center(
-                              child: AgoraVideoView(
-                                controller: _selectedUserId == 0
-                                    ? VideoViewController(
-                                  rtcEngine: _engine,
-                                  canvas: VideoCanvas(uid: 0),
-                                )
-                                    : VideoViewController.remote(
-                                  rtcEngine: _engine,
-                                  canvas:
-                                  VideoCanvas(uid: _selectedUserId!),
-                                  connection: RtcConnection(
-                                      channelId: "videoCalling"),
+    return WillPopScope(
+      onWillPop: () async {
+        await  enablePip();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Agora Flutter'),
+        ),
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: PageView(
+                  padEnds: false,
+                  reverse: false,
+                  physics: BouncingScrollPhysics(),
+                  onPageChanged: (value) {
+                    setState(() {
+                      currentPageIndex = value;
+                    });
+                    pageController.animateToPage(
+                      value,
+                      duration: Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    if (_selectedUserId != null)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onDoubleTap: () {
+                            setState(() {
+                              _selectedUserId =
+                              null; // Reset the selected view on double-tap
+                            });
+                          },
+                          child: Stack(
+                            children: [
+                              // Background: Fullscreen video for the selected user
+                              Center(
+                                child: AgoraVideoView(
+                                  controller: _selectedUserId == 0
+                                      ? VideoViewController(
+                                    rtcEngine: _engine,
+                                    canvas: VideoCanvas(uid: 0),
+                                  )
+                                      : VideoViewController.remote(
+                                    rtcEngine: _engine,
+                                    canvas:
+                                    VideoCanvas(uid: _selectedUserId!),
+                                    connection: RtcConnection(
+                                        channelId: "videoCalling"),
+                                  ),
                                 ),
                               ),
-                            ),
 
-                            // Local view: Small video window positioned in the top-left corner
-                            Positioned(
-                              top: 16, // Adjust for padding
-                              left: 16, // Adjust for padding
-                              child: GestureDetector(
-                                  onDoubleTap: () {
-                                    setState(() {
-                                      _selectedUserId =
-                                      0; // Switch to local user view on tap
-                                    });
-                                  },
-                                  child: _selectedUserId == 0
-                                      ? SizedBox.shrink()
-                                      : Container(
-                                    width: 200,
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                          color: Colors.white, width: 2),
-                                      borderRadius:
-                                      BorderRadius.circular(8),
-                                      color: Colors.black,
-                                    ),
-                                    child: AgoraVideoView(
-                                      controller: VideoViewController(
-                                        rtcEngine: _engine,
-                                        canvas: VideoCanvas(uid: 0),
+                              // Local view: Small video window positioned in the top-left corner
+                              Positioned(
+                                top: 16, // Adjust for padding
+                                left: 16, // Adjust for padding
+                                child: GestureDetector(
+                                    onDoubleTap: () {
+                                      setState(() {
+                                        _selectedUserId =
+                                        0; // Switch to local user view on tap
+                                      });
+                                    },
+                                    child: _selectedUserId == 0
+                                        ? SizedBox.shrink()
+                                        : Container(
+                                      width: 200,
+                                      height: 200,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                            color: Colors.white, width: 2),
+                                        borderRadius:
+                                        BorderRadius.circular(8),
+                                        color: Colors.black,
                                       ),
-                                    ),
-                                  )),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  _viewRows(),
-                  _viewSecondRows(),
-
-                  // _viewRows(),
-                  // viewRowsFirstPage(),
-                ],
-                controller: pageController,
-              ),
-            ),
-            // _viewRows(),
-            // _panel(),
-            _toolbar(),
-            _users.length >= 1
-                ? Positioned(
-              top: MediaQuery.of(context).size.height /
-                  1.55, // Adjust this value to position the PageView indicator
-              left: 0,
-              right: 0,
-              child: SizedBox(
-                height: 100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    2,
-                        (index) {
-                      return GestureDetector(
-                        onTap: () {
-                          pageController.animateToPage(
-                            index,
-                            duration: Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                          print("select index is ${index}");
-                        },
-                        child: Container(
-                          margin: EdgeInsets.all(5),
-                          height: 10.h,
-                          width: 10.w,
-                          decoration: BoxDecoration(
-                            color: currentPageIndex == index
-                                ? Colors.blue
-                                : AppColor.greyTealColor,
-                            shape: BoxShape.circle,
-                            border:
-                            Border.all(color: Colors.white, width: 2),
+                                      child: AgoraVideoView(
+                                        controller: VideoViewController(
+                                          rtcEngine: _engine,
+                                          canvas: VideoCanvas(uid: 0),
+                                        ),
+                                      ),
+                                    )),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    _viewRows(),
+                    _viewSecondRows(),
+
+                    // _viewRows(),
+                    // viewRowsFirstPage(),
+                  ],
+                  controller: pageController,
                 ),
               ),
-            )
-                : SizedBox.shrink(),
-          ],
+              // _viewRows(),
+              // _panel(),
+              _toolbar(),
+              _users.length >= 1
+                  ? Positioned(
+                top: MediaQuery.of(context).size.height /
+                    1.55, // Adjust this value to position the PageView indicator
+                left: 0,
+                right: 0,
+                child: SizedBox(
+                  height: 100,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      2,
+                          (index) {
+                        return GestureDetector(
+                          onTap: () {
+                            pageController.animateToPage(
+                              index,
+                              duration: Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                            print("select index is ${index}");
+                          },
+                          child: Container(
+                            margin: EdgeInsets.all(5),
+                            height: 10.h,
+                            width: 10.w,
+                            decoration: BoxDecoration(
+                              color: currentPageIndex == index
+                                  ? Colors.blue
+                                  : AppColor.greyTealColor,
+                              shape: BoxShape.circle,
+                              border:
+                              Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              )
+                  : SizedBox.shrink(),
+            ],
+          ),
         ),
       ),
     );

@@ -1,10 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_demo_structure/core/api/base_response/base_response.dart';
 import 'package:flutter_demo_structure/core/exceptions/app_exceptions.dart';
@@ -19,15 +16,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobx/mobx.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:uuid/uuid.dart';
-
 import '../../../../data/repository_impl/auth_repo_impl.dart';
 import '../../../core/api/base_response/fb_user_data.dart';
 import '../../../core/db/app_db.dart';
-
 part 'auth_store.g.dart';
 
-class AuthStore = _AuthStoreBase with _$AuthStore;
 
+class AuthStore = _AuthStoreBase with _$AuthStore;
 abstract class _AuthStoreBase with Store {
   late StreamSubscription<ConnectivityResult> _subscription;
   @observable
@@ -38,6 +33,12 @@ abstract class _AuthStoreBase with Store {
 
   @observable
   String? errorMessage;
+
+  @observable
+  bool isBluetoothHeadphoneConnected = false;
+
+  @observable
+  String connectedDeviceName = "None";
 
   // Observable for connection status
   @observable
@@ -98,6 +99,46 @@ abstract class _AuthStoreBase with Store {
   void updateNetworkStatus(String status) {
     networkStatus = status;
   }
+
+  /// bluetooth connection
+
+  // @action
+  // Future<void> checkBluetoothConnection() async {
+  //   final connectedDevices = await flutterBlue.connectedDevices;
+  //   final headphones = connectedDevices.firstWhere(
+  //         (device) => device.name.toLowerCase().contains('headphone'),
+  //     orElse: () => null,
+  //   );
+  //
+  //   if (headphones != null) {
+  //     isBluetoothHeadphoneConnected = true;
+  //     connectedDeviceName = headphones.name;
+  //     _routeAudioToBluetooth();
+  //   } else {
+  //     isBluetoothHeadphoneConnected = false;
+  //     connectedDeviceName = "None";
+  //     _routeAudioToSpeaker();
+  //   }
+  // }
+  //
+  // // Private method to route audio to Bluetooth
+  // Future<void> _routeAudioToBluetooth() async {
+  //   try {
+  //     await SystemChannels.platform.invokeMethod('setSpeakerphoneOn', false); // Android-specific
+  //   } catch (e) {
+  //     print("Failed to route audio to Bluetooth: $e");
+  //   }
+  // }
+  //
+  // // Private method to route audio to speaker
+  // Future<void> _routeAudioToSpeaker() async {
+  //   try {
+  //     await SystemChannels.platform.invokeMethod('setSpeakerphoneOn', true); // Android-specific
+  //   } catch (e) {
+  //     print("Failed to route audio to speaker: $e");
+  //   }
+  // }
+
 
   @action
   Future logout() async {
@@ -177,7 +218,6 @@ abstract class _AuthStoreBase with Store {
       // );
       // var data =
       //     await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-
       return null;
     }
   }

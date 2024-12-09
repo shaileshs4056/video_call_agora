@@ -54,7 +54,7 @@ class IndexState extends State<IndexPage> {
                         border: UnderlineInputBorder(
                           borderSide: BorderSide(width: 1),
                         ),
-                        hintText: 'Channel name',
+                       hintText: 'Channel name',
                       ),
                     ),
                   )
