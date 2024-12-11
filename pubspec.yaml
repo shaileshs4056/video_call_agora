@@ -89,7 +89,7 @@ dependencies:
   #social login
   twitter_login: ^4.4.2
   google_sign_in: ^6.2.1
-  sign_in_with_apple: ^5.0.0
+#  sign_in_with_apple: ^5.0.0
   flutter_web_auth: ^0.5.0
   uuid: ^4.3.3
   flutter_facebook_auth: ^6.0.4

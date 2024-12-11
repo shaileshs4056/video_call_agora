@@ -14,7 +14,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobx/mobx.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+// import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/repository_impl/auth_repo_impl.dart';
 import '../../../core/api/base_response/fb_user_data.dart';
@@ -157,70 +157,70 @@ abstract class _AuthStoreBase with Store {
     }
   }
 
-  Future<UserDataResponse?> signInWithApple() async {
-    bool isAvailable = await SignInWithApple.isAvailable();
-    debugPrint("Apple Login available..? $isAvailable");
-    final clientState = Uuid().v4();
-    if (isAvailable) {
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        webAuthenticationOptions: WebAuthenticationOptions(
-            clientId: 'com.whotry.android',
-            redirectUri: Uri.parse(
-              'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
-            )),
-        state: clientState,
-      );
-      debugPrint("userIdentifier    ${credential.userIdentifier}");
-      debugPrint("givenName         ${credential.givenName}");
-      debugPrint("familyName        ${credential.familyName}");
-      debugPrint("email             ${credential.email}");
-      debugPrint("authorizationCode ${credential.authorizationCode}");
-      debugPrint("identityToken     ${credential.identityToken}");
-      debugPrint("state             ${credential.state}");
-      if (credential.identityToken != null) {
-        var result = parseJwt(credential.identityToken!);
-        if (credential.givenName != null && credential.familyName != null) {
-          await storage.write(
-              key: "${result["sub"]}firstName", value: credential.givenName);
-          await storage.write(
-              key: "${result["sub"]}lastName", value: credential.familyName);
-        }
-        return UserDataResponse(
-            sub: result["sub"],
-            email: result["email"],
-            firstName: credential.givenName,
-            lastName: credential.familyName);
-      } else {
-        return null;
-      }
-    } else {
-      final url = Uri.https('appleid.apple.com', '/auth/authorize', {
-        'response_type': 'code id_token',
-        'client_id': 'com.example.android',
-        'response_mode': 'form_post',
-        'redirect_uri':
-            'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
-        'scope': 'email name',
-        'state': clientState,
-      });
-
-      final result = await FlutterWebAuth.authenticate(
-          url: url.toString(), callbackUrlScheme: "applink");
-
-      final body = Uri.parse(result).queryParameters;
-      // final oauthCredential = OAuthProvider("apple.com").credential(
-      //   idToken: body['id_token'],
-      //   accessToken: body['code'],
-      // );
-      // var data =
-      //     await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-      return null;
-    }
-  }
+  // Future<UserDataResponse?> signInWithApple() async {
+  //   bool isAvailable = await SignInWithApple.isAvailable();
+  //   debugPrint("Apple Login available..? $isAvailable");
+  //   final clientState = Uuid().v4();
+  //   if (isAvailable) {
+  //     final credential = await SignInWithApple.getAppleIDCredential(
+  //       scopes: [
+  //         AppleIDAuthorizationScopes.email,
+  //         AppleIDAuthorizationScopes.fullName,
+  //       ],
+  //       webAuthenticationOptions: WebAuthenticationOptions(
+  //           clientId: 'com.whotry.android',
+  //           redirectUri: Uri.parse(
+  //             'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
+  //           )),
+  //       state: clientState,
+  //     );
+  //     debugPrint("userIdentifier    ${credential.userIdentifier}");
+  //     debugPrint("givenName         ${credential.givenName}");
+  //     debugPrint("familyName        ${credential.familyName}");
+  //     debugPrint("email             ${credential.email}");
+  //     debugPrint("authorizationCode ${credential.authorizationCode}");
+  //     debugPrint("identityToken     ${credential.identityToken}");
+  //     debugPrint("state             ${credential.state}");
+  //     if (credential.identityToken != null) {
+  //       var result = parseJwt(credential.identityToken!);
+  //       if (credential.givenName != null && credential.familyName != null) {
+  //         await storage.write(
+  //             key: "${result["sub"]}firstName", value: credential.givenName);
+  //         await storage.write(
+  //             key: "${result["sub"]}lastName", value: credential.familyName);
+  //       }
+  //       return UserDataResponse(
+  //           sub: result["sub"],
+  //           email: result["email"],
+  //           firstName: credential.givenName,
+  //           lastName: credential.familyName);
+  //     } else {
+  //       return null;
+  //     }
+  //   } else {
+  //     final url = Uri.https('appleid.apple.com', '/auth/authorize', {
+  //       'response_type': 'code id_token',
+  //       'client_id': 'com.example.android',
+  //       'response_mode': 'form_post',
+  //       'redirect_uri':
+  //           'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
+  //       'scope': 'email name',
+  //       'state': clientState,
+  //     });
+  //
+  //     final result = await FlutterWebAuth.authenticate(
+  //         url: url.toString(), callbackUrlScheme: "applink");
+  //
+  //     final body = Uri.parse(result).queryParameters;
+  //     // final oauthCredential = OAuthProvider("apple.com").credential(
+  //     //   idToken: body['id_token'],
+  //     //   accessToken: body['code'],
+  //     // );
+  //     // var data =
+  //     //     await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+  //     return null;
+  //   }
+  // }
 
   Future<UserData?> loginFb() async {
     final LoginResult result = await FacebookAuth.i.login(

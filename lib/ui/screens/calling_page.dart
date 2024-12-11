@@ -8,10 +8,12 @@ import 'package:auto_route/annotations.dart';
 import 'package:floating/floating.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_demo_structure/values/colors.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../auth/store/auth_store.dart';
 
 const String appID = '2ac013422f444292914c234d228b87bb'; // Your Agora App ID
-const String token = "007eJxTYGhvSKzduOytwtOOJy9vMOfwXamMK16z8t6CjcumnFrQ8KRAgcEoMdnA0NjEyCjNxMTEyNLI0tAk2cjYJMXIyCLJwjwpaX1zWHpDICNDqOhSVkYGCATxeRjKMlNS850Tc3Iy89IZGABCECSr"; // Your Agora Token
+const String token = "007eJxTYFBUP5ze3dsYu8dV7281Y+nqWNWY9Z79lcu7csOq5hx0EFFgMEpMNjA0NjEySjMxMTGyNLI0NEk2MjZJMTKySLIwT0q6bhWZ3hDIyCCzNZiZkQECQXwehrLMlNR858ScnMy8dAYGAJbRH9s="; // Your Agora Token
 
 @RoutePage()
 class CallPage extends StatefulWidget {
@@ -70,7 +72,7 @@ class _CallPageState extends State<CallPage>
     // initialize agora sdk
     initialize();
     WidgetsBinding.instance.addObserver(this);
-
+    authStore.startMonitoring();
     pageController = PageController(
       initialPage: 0,
     );
@@ -282,48 +284,135 @@ class _CallPageState extends State<CallPage>
   }
 
 
+  //runnig
+
   List<Widget> _getRenderViewsForPageTwo() {
     final List<Widget> list = [];
 
-    // Check if there are users beyond the first 5
-    if (_users.length > 5) {
-      // Iterate through users starting from index 5
-      _users.sublist(5, _users.length).forEach((int uid) {
+    // Add local user view
+
+
+    /*// Local view
+    list.add(
+      Container(
+        color: AppColor.red,
+        child: AgoraVideoView(
+          controller: VideoViewController(
+            rtcEngine: _engine,
+            canvas: VideoCanvas(uid: 0), // 0 for the local user
+          ),
+        ),
+      ),
+    );*/
+
+    // Remote views for each user in _users list
+    if(_users.length>5)
+      _users.sublist(5,_users.length).forEach((int uid) {
+
         list.add(
           GestureDetector(
-            onTap: () {
-              // Toggle video on/off for the user
+            onDoubleTap: () {
               setState(() {
-                userVideoStates[uid] = !(userVideoStates[uid] ?? true);
+                _selectedUserId = uid; // Select remote user
               });
             },
-            child: Container(
+            child: (userVideoStates[uid] ?? false) // Check if remote video is muted
+                ? Container(
+              color: Colors.black,
+              child: Center(
+                child: Icon(Icons.person, color: Colors.white, size: 50.0),
+              ),
+            ):Container(
               color: AppColor.green,
-              child: userVideoStates[uid] ?? true // Check if video is ON
-                  ? AgoraVideoView(
-                key: Key(uid.toString()),
+              child: AgoraVideoView(
+                key: Key(uid.toString()), // Unique key for each remote view
                 controller: VideoViewController.remote(
                   rtcEngine: _engine,
-                  canvas: VideoCanvas(uid: uid),
+                  canvas: VideoCanvas(uid: uid), // Remote user's video canvas
                   connection: RtcConnection(channelId: "videoCalling"),
-                ),
-              )
-                  : Center(
-                child: Icon(
-                  Icons.videocam_off,
-                  color: Colors.red,
-                  size: 50,
                 ),
               ),
             ),
           ),
         );
       });
-    }
 
     return list;
   }
 
+  // List<Widget> _getRenderViewsForPageTwo() {
+  //   final List<Widget> list = [];
+  //   // Check if there are users beyond the first 5
+  //   if (_users.length > 5) {
+  //
+  //     // Iterate through users starting from index 5
+  //     _users.sublist(5, _users.length).forEach((int uid) {
+  //       list.add(
+  //         GestureDetector(
+  //           onTap: () {
+  //             // Toggle video on/off for the user
+  //             // setState(() {
+  //             //   userVideoStates[uid] = !(userVideoStates[uid] ?? true);
+  //             // });
+  //           },
+  //           child: Container(
+  //             child: userVideoStates[uid] ?? false // Check if video is ON
+  //                 ? Container(
+  //               color: Colors.black,
+  //               child: Center(
+  //                 child: Icon(Icons.person, color: Colors.white, size: 50.0),
+  //               ),
+  //             )
+  //                 : AgoraVideoView(
+  //               key: Key(uid.toString()), // Unique key for each remote view
+  //               controller: VideoViewController.remote(
+  //                 rtcEngine: _engine,
+  //                 canvas: VideoCanvas(uid: uid), // Remote user's video canvas
+  //                 connection: RtcConnection(channelId: "videoCalling"),
+  //               ),
+  //             ),
+  //
+  //           ),
+  //         ),
+  //       );
+  //     });
+  //   }
+  //   return list;
+  // }
+  //
+
+  // List<Widget> _getRenderViewsForPageTwo() {
+  //   final List<Widget> list = [];
+  //   if(_users.length>5){
+  //     _users.sublist(5, _users.length).forEach((int uid) {
+  //       list.add(
+  //         GestureDetector(
+  //           onDoubleTap: () {
+  //             setState(() {
+  //               _selectedUserId = uid; // Select remote user
+  //             });
+  //           },
+  //           child: (userVideoStates[uid] ?? false) // Check if remote video is muted
+  //               ? Container(
+  //             color: Colors.black,
+  //             child: Center(
+  //               child: Icon(Icons.person, color: Colors.white, size: 50.0),
+  //             ),
+  //           )
+  //               : AgoraVideoView(
+  //             key: Key(uid.toString()), // Unique key for each remote view
+  //             controller: VideoViewController.remote(
+  //               rtcEngine: _engine,
+  //               canvas: VideoCanvas(uid: uid), // Remote user's video canvas
+  //               connection: RtcConnection(channelId: "videoCalling"),
+  //             ),
+  //           ),
+  //         ),
+  //       );
+  //     });
+  //   }
+  //   return list;
+  // }
   Future<void> _onDisableVideoButton() async {
     if (isVideoDisabled == true) {
       _engine.disableVideo();
@@ -343,6 +432,18 @@ class _CallPageState extends State<CallPage>
     return Expanded(
       child: Row(
         children: wrappedViews,
+      ),
+    );
+  }
+
+  Widget _secondPageExpandedVideoRow(List<Widget> views) {
+    return Expanded(
+      child: Row(
+        children: views.map((view) {
+          return Expanded(
+            child: view, // Directly render the widget or placeholder
+          );
+        }).toList(),
       ),
     );
   }
@@ -406,71 +507,109 @@ class _CallPageState extends State<CallPage>
     }
     return Container();
   }
-
+  // Widget _viewRows() {
+  //   final views = _getRenderViewsForPageOne();
+  //
+  //   // Ensure 6 slots, replacing null with placeholders
+  //   final paddedViews = List.generate(
+  //     6,
+  //         (index) => index < views.length ? _videoView(views[index]) : Container(color: Colors.black),
+  //   );
+  //
+  //   return Container(
+  //     child: Column(
+  //       children: [
+  //         _expandedVideoRow(paddedViews.sublist(0, 2)),
+  //         _expandedVideoRow(paddedViews.sublist(2, 4)),
+  //         _expandedVideoRow(paddedViews.sublist(4, 6)),
+  //       ],
+  //     ),
+  //   );
+  // }
   Widget _viewSecondRows() {
     final views = _getRenderViewsForPageTwo();
-    switch (views.length) {
-      case 1:
-        return Container(
-            child: Column(
-              children: <Widget>[_videoView(views[0])],
-            ));
-      case 2:
-        return Container(
-            child: Column(
-              children: <Widget>[
-                _expandedVideoRow([views[0]]),
-                _expandedVideoRow([views[1]])
-              ],
-            ));
-      case 3:
-        return Container(
-            child: Column(
-              children: <Widget>[
-                _expandedVideoRow(views.sublist(0, 2)),
-                _expandedVideoRow(views.sublist(2, 3))
-              ],
-            ));
 
-      case 7:
-        return Container(
-          child: Column(
-            children: <Widget>[
-              _expandedVideoRow(views.sublist(0, 2)),
-              _expandedVideoRow(views.sublist(2, 4)),
-              _expandedVideoRow(views.sublist(4, 6)),
-              _expandedVideoRow(views.sublist(6, 7))
-            ],
-          ),
-        );
-      case 8:
-        return Container(
-          child: Column(
-            children: <Widget>[
-              _expandedVideoRow(views.sublist(0, 2)),
-              _expandedVideoRow(views.sublist(2, 4)),
-              _expandedVideoRow(views.sublist(4, 6)),
-              _expandedVideoRow(views.sublist(6, 8))
-            ],
-          ),
-        );
-      case 9:
-        return Container(
-          child: Column(
-            children: <Widget>[
-              _expandedVideoRow(views.sublist(0, 2)),
-              _expandedVideoRow(views.sublist(2, 4)),
-              _expandedVideoRow(views.sublist(4, 6)),
-              _expandedVideoRow(views.sublist(6, 8)),
-              _expandedVideoRow(views.sublist(8, 9))
-            ],
-          ),
-        );
+    // Ensure 6 slots with placeholders for missing views
+    final paddedViews = List.generate(
+      6,
+          (index) => index < views.length ? _videoView(views[index]) : Container(color: Colors.black), // Placeholder
+    );
 
-      default:
-    }
-    return Container();
+    return Container(
+      child: Column(
+        children: [
+          _secondPageExpandedVideoRow(paddedViews.sublist(0, 2)),
+          _secondPageExpandedVideoRow(paddedViews.sublist(2, 4)),
+          _secondPageExpandedVideoRow(paddedViews.sublist(4, 6)),
+        ],
+      ),
+    );
   }
+
+  // Widget _viewSecondRows() {
+  //   final views = _getRenderViewsForPageTwo();
+  //   switch (views.length) {
+  //     case 1:
+  //       return Container(
+  //           child: Column(
+  //             children: <Widget>[_videoView(views[0])],
+  //           ));
+  //     case 2:
+  //       return Container(
+  //           child: Column(
+  //             children: <Widget>[
+  //               _expandedVideoRow([views[0]]),
+  //               _expandedVideoRow([views[1]])
+  //             ],
+  //           ));
+  //     case 3:
+  //       return Container(
+  //           child: Column(
+  //             children: <Widget>[
+  //               _expandedVideoRow(views.sublist(0, 2)),
+  //               _expandedVideoRow(views.sublist(2, 3))
+  //             ],
+  //           ));
+  //
+  //     case 7:
+  //       return Container(
+  //         child: Column(
+  //           children: <Widget>[
+  //             _expandedVideoRow(views.sublist(0, 2)),
+  //             _expandedVideoRow(views.sublist(2, 4)),
+  //             _expandedVideoRow(views.sublist(4, 6)),
+  //             _expandedVideoRow(views.sublist(6, 7))
+  //           ],
+  //         ),
+  //       );
+  //     case 8:
+  //       return Container(
+  //         child: Column(
+  //           children: <Widget>[
+  //             _expandedVideoRow(views.sublist(0, 2)),
+  //             _expandedVideoRow(views.sublist(2, 4)),
+  //             _expandedVideoRow(views.sublist(4, 6)),
+  //             _expandedVideoRow(views.sublist(6, 8))
+  //           ],
+  //         ),
+  //       );
+  //     case 9:
+  //       return Container(
+  //         child: Column(
+  //           children: <Widget>[
+  //             _expandedVideoRow(views.sublist(0, 2)),
+  //             _expandedVideoRow(views.sublist(2, 4)),
+  //             _expandedVideoRow(views.sublist(4, 6)),
+  //             _expandedVideoRow(views.sublist(6, 8)),
+  //             _expandedVideoRow(views.sublist(8, 9))
+  //           ],
+  //         ),
+  //       );
+  //
+  //     default:
+  //   }
+  //   return Container();
+  // }
 
   Widget viewBlackContainer() {
     return Expanded(
@@ -728,7 +867,7 @@ class _CallPageState extends State<CallPage>
               // _viewRows(),
               // _panel(),
               _toolbar(),
-              _users.length >= 1
+              _users.length >= 6
                   ? Positioned(
                 top: MediaQuery.of(context).size.height /
                     1.55, // Adjust this value to position the PageView indicator
@@ -770,6 +909,19 @@ class _CallPageState extends State<CallPage>
                 ),
               )
                   : SizedBox.shrink(),
+              Observer(
+                builder: (_) => Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    padding: const EdgeInsets.all(8.0),
+                    color: Colors.black.withOpacity(0.5),
+                    child: Text(
+                      "Network Status: ${authStore.networkStatus}",
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
