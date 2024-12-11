@@ -11,13 +11,9 @@ import 'package:flutter_demo_structure/data/model/request/login_request_model.da
 import 'package:flutter_demo_structure/data/model/response/user_profile_response.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobx/mobx.dart';
-// import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../data/repository_impl/auth_repo_impl.dart';
-import '../../../core/api/base_response/fb_user_data.dart';
 import '../../../core/db/app_db.dart';
 part 'auth_store.g.dart';
 

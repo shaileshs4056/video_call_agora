@@ -413,13 +413,13 @@ class _CallPageState extends State<CallPage>
   //   }
   //   return list;
   // }
-  Future<void> _onDisableVideoButton() async {
-    if (isVideoDisabled == true) {
-      _engine.disableVideo();
-    } else {
-      _engine.enableVideo();
-    }
-  }
+  // Future<void> _onDisableVideoButton() async {
+  //   if (isVideoDisabled == true) {
+  //     _engine.disableVideo();
+  //   } else {
+  //     _engine.enableVideo();
+  //   }
+  // }
 
   /// Video view wrapper
   Widget _videoView(view) {

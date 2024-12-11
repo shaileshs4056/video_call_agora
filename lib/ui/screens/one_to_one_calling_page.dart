@@ -29,14 +29,11 @@ class _VideoCallingPageState extends State<VideoCallingPage> with WidgetsBinding
   int currentPageIndex = 0;
   bool onVideoOff=false;
   int muteVideoRemoteId = 0;
-  bool _remoteVideoMuted = false; // Tracks remote user's video status
-  // bool _localVideoMuted = false;
   bool isLocalVideoDisabled = false;
   Map<int, bool> remoteVideoStates = {};// Tracks local user's video status
   bool _isSplitScreen = false;
   final Floating floating = Floating();
   bool isPipEnabled = false; // Tracks if PiP is active
-  StreamSubscription<ConnectivityResult>? _subscription;
   @override
   void initState() {
     super.initState();
@@ -175,20 +172,20 @@ class _VideoCallingPageState extends State<VideoCallingPage> with WidgetsBinding
   }
 
 
-  Future<void> _onDisableVideoButton() async {
-    setState(() {
-      isVideoDisabled = !isVideoDisabled; // Toggle local video state
-    });
-
-    // Notify the Agora SDK about local video mute/unmute
-    await _engine.muteLocalVideoStream(isVideoDisabled);
-
-    if (isVideoDisabled) {
-      print("Local user has disabled their video.");
-    } else {
-      print("Local user has enabled their video.");
-    }
-  }
+  // Future<void> _onDisableVideoButton() async {
+  //   setState(() {
+  //     isVideoDisabled = !isVideoDisabled; // Toggle local video state
+  //   });
+  //
+  //   // Notify the Agora SDK about local video mute/unmute
+  //   await _engine.muteLocalVideoStream(isVideoDisabled);
+  //
+  //   if (isVideoDisabled) {
+  //     print("Local user has disabled their video.");
+  //   } else {
+  //     print("Local user has enabled their video.");
+  //   }
+  // }
 
   Widget _toolbar() {
     // if (widget.role == ClientRoleType.clientRoleAudience) return Container();
