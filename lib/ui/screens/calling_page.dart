@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
-
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:auto_route/annotations.dart';
 import 'package:floating/floating.dart';
@@ -10,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_demo_structure/values/colors.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:mobx/mobx.dart';
 import '../auth/store/auth_store.dart';
 
 const String appID = '2ac013422f444292914c234d228b87bb'; // Your Agora App ID
@@ -48,6 +44,7 @@ class _CallPageState extends State<CallPage>
     // clear users
     authStore.users.clear();
     _dispose();
+    WidgetsBinding.instance.removeObserver(this);
     pageController.dispose();
     super.dispose();
   }
@@ -66,6 +63,7 @@ class _CallPageState extends State<CallPage>
         channelName: widget.channelName,
         role: widget.role,
         token: token);
+    authStore.startCall();
     // initialize agora sdk
     WidgetsBinding.instance.addObserver(this);
     authStore.startMonitoring();
@@ -384,9 +382,10 @@ class _CallPageState extends State<CallPage>
               child: RawMaterialButton(
                 onPressed: () {
                   authStore.onSpeakerButton();
+                  print("condition is ${authStore.onSpeaker}");
                 },
                 child: Icon(
-                  authStore.onSpeaker ? Icons.volume_up : Icons.volume_off,
+                  authStore.onSpeaker ? Icons.volume_up : Icons.phone,
                   color: Colors.blueAccent,
                   size: 25.0,
                 ),

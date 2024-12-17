@@ -220,24 +220,66 @@ abstract class _AuthStoreBase with Store {
     engine.muteLocalAudioStream(isMuted);
   }
 
-  ///end call action
+  /// End call action
   @action
   Future<void> onCallEnd(BuildContext context) async {
     try {
-      print("Leaving channel...");
+      print("Ending call...");
+
+
+
+      // Leave the Agora channel
       await engine.leaveChannel();
-      print("Channel left successfully.");
+      print("Left channel successfully.");
 
-      print("Releasing engine...");
+      // Release Agora engine
       await engine.release();
-      print("Engine released successfully.");
+      print("Agora engine released.");
 
+      // Stop any ongoing monitoring or observers
+      authStore.stopMonitoring();
+
+      // Navigate back to the previous screen
       Navigator.pop(context);
       print("Call ended and navigated back.");
+      // Reset state
+      selectedUserId = null;
+      currentPageIndex = 0;
+      isMuted = false; // Reset mute state
+      userVideoStates[0] = false; // Reset video state
+      onSpeaker = true; // Reset speaker state
     } catch (e) {
       print('Error ending call: $e');
     }
   }
+
+
+
+  ///start a call
+  @action
+  Future<void> startCall() async {
+    try {
+      print("Starting call...");
+
+      // Default: Unmute audio
+      isMuted = false;
+      await engine.muteLocalAudioStream(isMuted);
+
+      // Default: Enable video
+      userVideoStates[0] = false; // Video is not muted initially
+      await engine.muteLocalVideoStream(userVideoStates[0]!);
+
+      // Default: Enable speaker
+      onSpeaker = true;
+      await engine.setEnableSpeakerphone(onSpeaker);
+
+      print("Call settings initialized: Audio unmuted, video enabled, speaker enabled.");
+    } catch (e) {
+      print("Error during startCall: $e");
+    }
+  }
+
+
 
   /// switch camera
   void onSwitchCamera(){
@@ -290,16 +332,16 @@ abstract class _AuthStoreBase with Store {
   ///on speaker change
 
   void onSpeakerButton() {
-      if (onSpeaker) {
-        _engine.setEnableSpeakerphone(true);
-        // Switch to earpiece
-        onSpeaker = !onSpeaker;
-      } else {
-        _engine.setEnableSpeakerphone(false);
-
-        onSpeaker = !onSpeaker;// Switch to loudspeaker
-      }
+    // Toggle speakerphone mode
+    if (onSpeaker) {
+      engine.setEnableSpeakerphone(false); // Use earpiece
+    } else {
+      engine.setEnableSpeakerphone(true); // Use speakerphone
+    }
+    // Toggle the `onSpeaker` boolean to update the UI
+    onSpeaker = !onSpeaker;
   }
+
 
   @action
   Future login(LoginRequestModel request) async {
