@@ -12,7 +12,6 @@ import '../ui/screens/index_page.dart';
 import '../ui/screens/starting_page.dart';
 part 'app_router.gr.dart';
 
-
 @AutoRouterConfig(
   replaceInRouteName: 'Page,Route',
 )

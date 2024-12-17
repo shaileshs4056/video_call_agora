@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -9,18 +11,17 @@ import 'package:flutter_demo_structure/core/exceptions/dio_exception_util.dart';
 import 'package:flutter_demo_structure/core/locator/locator.dart';
 import 'package:flutter_demo_structure/data/model/request/login_request_model.dart';
 import 'package:flutter_demo_structure/data/model/response/user_profile_response.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobx/mobx.dart';
 import '../../../../data/repository_impl/auth_repo_impl.dart';
-import '../../../core/db/app_db.dart';
 part 'auth_store.g.dart';
 
 
 class AuthStore = _AuthStoreBase with _$AuthStore;
 abstract class _AuthStoreBase with Store {
   late StreamSubscription<ConnectivityResult> _subscription;
+  late RtcEngine _engine;
   @observable
   BaseResponse<UserData?>? loginResponse;
 
@@ -29,6 +30,10 @@ abstract class _AuthStoreBase with Store {
 
   @observable
   String? errorMessage;
+
+  // Currently selected user (for example, to focus the view)
+  @observable
+  int? selectedUserId = 0;
 
   @observable
   bool isBluetoothHeadphoneConnected = false;
@@ -40,17 +45,266 @@ abstract class _AuthStoreBase with Store {
   @observable
   String networkStatus = "Connected";
 
+  @observable
+  bool isMuted = false; // Tracks microphone mute/unmute state
+
+  @observable
+  bool onSpeaker = true; // Tracks speakerphone toggle state
+
+  @observable
+  int? _streamId;
+  // Observable to track the current page index
+  @observable
+  int currentPageIndex = 0;
+
+  @observable
+  ObservableList<Widget> list = ObservableList<Widget>();
+
   final GoogleSignIn googleSignIn = GoogleSignIn();
 
+  @observable
+  ObservableList<String> infoStrings = ObservableList<String>();
+
+  // List of users (both local and remote)
+  @observable
+  ObservableList<int> users = ObservableList<int>();
+
+  @observable
+  ObservableMap<int, bool> userVideoStates = ObservableMap<int, bool>();
+
+  // Getter for accessing the engine
+  RtcEngine get engine => _engine;
+
+
+
   _AuthStoreBase();
+
+  // Actions
+  @action
+  void addUser(int uid) {
+    if (!users.contains(uid)) {
+      users.add(uid);
+    }
+  }
+
+  @action
+  void removeUser(int uid) {
+    users.remove(uid);
+  }
+
+  // Action to automatically update the selected user
+  @action
+  void updateSelectedUser() {
+    if (users.isNotEmpty) {
+      selectedUserId = users.first; // Default to the first user
+    } else {
+      selectedUserId = 0; // Default to local user
+    }
+  }
+
+  @action
+  void updateVideoState(int uid, bool isMuted) {
+    userVideoStates[uid] = isMuted;
+  }
+
+  @action
+  void selectUser(int uid) {
+    selectedUserId = uid;
+  }
+
+  @action
+  void setPageIndex(int index) {
+    currentPageIndex = index;
+  }
+
+  // Actions to update states
+  @action
+  void setSelectedUserId(int? uid) {
+    selectedUserId = uid;
+  }
+
+  @action
+  Future<void> initialize({
+    required String appId,
+    required String channelName,
+    required ClientRoleType role,
+    required String token,
+  }) async {
+    if (appId.isEmpty) {
+      infoStrings.add('APP_ID missing, please provide your APP_ID in settings.dart');
+      infoStrings.add('Agora Engine is not starting');
+      return;
+    }
+
+    await _initAgoraRtcEngine(appId, role);
+    _addAgoraEventHandlers();
+
+    VideoEncoderConfiguration configuration = VideoEncoderConfiguration (
+      dimensions: VideoDimensions(width: 1920, height: 1080),
+    );
+
+    await _engine.setVideoEncoderConfiguration(configuration);
+    await _engine.joinChannel(
+      token: token,
+      channelId: channelName,
+      uid: 0,
+      options: ChannelMediaOptions(),
+    );
+  }
+
+  /// here starting _initAgoraRtcEngine
+  @action
+  Future<void> _initAgoraRtcEngine(String appId, ClientRoleType role) async {
+    _engine = createAgoraRtcEngine();
+    await _engine.initialize(
+      RtcEngineContext(
+        appId: appId,
+        channelProfile: ChannelProfileType.channelProfileCommunication,
+      ),
+    );
+    await _engine.enableVideo();
+    await _engine.setChannelProfile(ChannelProfileType.channelProfileLiveBroadcasting);
+    await _engine.setClientRole(role: role);
+  }
+
+  /// Add Agora event handlers
+  @action
+  void _addAgoraEventHandlers() {
+    _engine.registerEventHandler(RtcEngineEventHandler(
+      onError: (err, msg) {
+        infoStrings.add('onError: $msg');
+      },
+      onJoinChannelSuccess: (connection, elapsed) {
+        infoStrings.add('onJoinChannel: ${connection.channelId}, uid: ${connection.localUid}');
+      },
+      onLeaveChannel: (connection, stats) {
+        infoStrings.add('onLeaveChannel');
+        users.clear();
+      },
+      onUserJoined: (connection, remoteUid, elapsed) {
+        infoStrings.add('userJoined: $remoteUid');
+        users.add(remoteUid);
+      },
+      onUserOffline: (connection, remoteUid, reason) {
+        infoStrings.add('userOffline: $remoteUid');
+        users.remove(remoteUid);
+      },
+      onFirstRemoteVideoFrame: (connection, remoteUid, width, height, elapsed) {
+        infoStrings.add('firstRemoteVideo: $remoteUid ${width}x$height');
+      },
+      onUserMuteVideo: (connection, remoteUid, muted) {
+        userVideoStates[remoteUid] = muted;
+      },
+      onStreamMessage: (connection, remoteUid, streamId, data, length, sentTs) {
+        try {
+          String message = String.fromCharCodes(data);
+          final decodedMessage = jsonDecode(message);
+
+          if (decodedMessage["uid"] != null && decodedMessage["videoMuted"] != null) {
+            userVideoStates[decodedMessage["uid"]] = decodedMessage["videoMuted"];
+          }
+        } catch (e) {
+          print("Error handling stream message: $e");
+        }
+      },
+      onStreamMessageError: (connection, remoteUid, streamId, error, missed, cached) {
+        print("Stream message error: $error");
+      },
+    ));
+  }
+
+  /// mute audio action
+  @action
+  void muteAudio(){
+    isMuted = !isMuted;
+    engine.muteLocalAudioStream(isMuted);
+  }
+
+  ///end call action
+  @action
+  Future<void> onCallEnd(BuildContext context) async {
+    try {
+      print("Leaving channel...");
+      await engine.leaveChannel();
+      print("Channel left successfully.");
+
+      print("Releasing engine...");
+      await engine.release();
+      print("Engine released successfully.");
+
+      Navigator.pop(context);
+      print("Call ended and navigated back.");
+    } catch (e) {
+      print('Error ending call: $e');
+    }
+  }
+
+  /// switch camera
+  void onSwitchCamera(){
+    engine.switchCamera();
+  }
+
+  ///toggle video
+  @action
+  void toggleLocalVideo() {
+      userVideoStates[0] = !(userVideoStates[0] ?? false); // Toggle local video state.
+      print( userVideoStates[0]);
+      print("your id is");
+
+    // Mute or unmute the local video stream
+    engine.muteLocalVideoStream(userVideoStates[0] ?? false);
+
+    // Broadcast the local video state to remote users
+    if (_streamId != null) {
+      try {
+        // Create the message data
+        String message = jsonEncode({
+          "uid": 0, // Local user ID
+          "videoMuted": userVideoStates[0], // Video muted state
+        });
+
+        // Convert the message to Uint8List
+        Uint8List messageData = Uint8List.fromList(message.codeUnits);
+
+        // Calculate the length of the message
+        int length = messageData.length;
+
+        // Send the message with the calculated length
+        _engine.sendStreamMessage(
+          streamId: _streamId!,
+          data: messageData,
+          length: length, // Specify the length here
+        );
+      } catch (e) {
+        print("Error sending stream message: $e");
+      }
+    }
+  }
+
+  ///current page index
+
+  @action
+  void setCurrentPageIndex(int value) {
+    currentPageIndex = value;
+  }
+  ///on speaker change
+
+  void onSpeakerButton() {
+      if (onSpeaker) {
+        _engine.setEnableSpeakerphone(true);
+        // Switch to earpiece
+        onSpeaker = !onSpeaker;
+      } else {
+        _engine.setEnableSpeakerphone(false);
+
+        onSpeaker = !onSpeaker;// Switch to loudspeaker
+      }
+  }
 
   @action
   Future login(LoginRequestModel request) async {
     try {
       errorMessage = null;
-      // var commonStoreFuture =
-      //     ObservableFuture<BaseResponse<UserData?>>(authRepo.signIn(request));
-      // loginResponse = await commonStoreFuture;
       await Future.delayed(const Duration(seconds: 5), () {});
       loginResponse = BaseResponse(message: "Login successfully", code: "1");
     } on DioException catch (dioError) {
@@ -63,6 +317,12 @@ abstract class _AuthStoreBase with Store {
       errorMessage = e.toString();
     }
   }
+
+  @action
+  void resetSelectedUser() {
+    selectedUserId = null;
+  }
+
 
   // Initialize connectivity monitoring
   @action
@@ -96,46 +356,6 @@ abstract class _AuthStoreBase with Store {
     networkStatus = status;
   }
 
-  /// bluetooth connection
-
-  // @action
-  // Future<void> checkBluetoothConnection() async {
-  //   final connectedDevices = await flutterBlue.connectedDevices;
-  //   final headphones = connectedDevices.firstWhere(
-  //         (device) => device.name.toLowerCase().contains('headphone'),
-  //     orElse: () => null,
-  //   );
-  //
-  //   if (headphones != null) {
-  //     isBluetoothHeadphoneConnected = true;
-  //     connectedDeviceName = headphones.name;
-  //     _routeAudioToBluetooth();
-  //   } else {
-  //     isBluetoothHeadphoneConnected = false;
-  //     connectedDeviceName = "None";
-  //     _routeAudioToSpeaker();
-  //   }
-  // }
-  //
-  // // Private method to route audio to Bluetooth
-  // Future<void> _routeAudioToBluetooth() async {
-  //   try {
-  //     await SystemChannels.platform.invokeMethod('setSpeakerphoneOn', false); // Android-specific
-  //   } catch (e) {
-  //     print("Failed to route audio to Bluetooth: $e");
-  //   }
-  // }
-  //
-  // // Private method to route audio to speaker
-  // Future<void> _routeAudioToSpeaker() async {
-  //   try {
-  //     await SystemChannels.platform.invokeMethod('setSpeakerphoneOn', true); // Android-specific
-  //   } catch (e) {
-  //     print("Failed to route audio to speaker: $e");
-  //   }
-  // }
-
-
   @action
   Future logout() async {
     try {
@@ -153,189 +373,6 @@ abstract class _AuthStoreBase with Store {
     }
   }
 
-  // Future<UserDataResponse?> signInWithApple() async {
-  //   bool isAvailable = await SignInWithApple.isAvailable();
-  //   debugPrint("Apple Login available..? $isAvailable");
-  //   final clientState = Uuid().v4();
-  //   if (isAvailable) {
-  //     final credential = await SignInWithApple.getAppleIDCredential(
-  //       scopes: [
-  //         AppleIDAuthorizationScopes.email,
-  //         AppleIDAuthorizationScopes.fullName,
-  //       ],
-  //       webAuthenticationOptions: WebAuthenticationOptions(
-  //           clientId: 'com.whotry.android',
-  //           redirectUri: Uri.parse(
-  //             'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
-  //           )),
-  //       state: clientState,
-  //     );
-  //     debugPrint("userIdentifier    ${credential.userIdentifier}");
-  //     debugPrint("givenName         ${credential.givenName}");
-  //     debugPrint("familyName        ${credential.familyName}");
-  //     debugPrint("email             ${credential.email}");
-  //     debugPrint("authorizationCode ${credential.authorizationCode}");
-  //     debugPrint("identityToken     ${credential.identityToken}");
-  //     debugPrint("state             ${credential.state}");
-  //     if (credential.identityToken != null) {
-  //       var result = parseJwt(credential.identityToken!);
-  //       if (credential.givenName != null && credential.familyName != null) {
-  //         await storage.write(
-  //             key: "${result["sub"]}firstName", value: credential.givenName);
-  //         await storage.write(
-  //             key: "${result["sub"]}lastName", value: credential.familyName);
-  //       }
-  //       return UserDataResponse(
-  //           sub: result["sub"],
-  //           email: result["email"],
-  //           firstName: credential.givenName,
-  //           lastName: credential.familyName);
-  //     } else {
-  //       return null;
-  //     }
-  //   } else {
-  //     final url = Uri.https('appleid.apple.com', '/auth/authorize', {
-  //       'response_type': 'code id_token',
-  //       'client_id': 'com.example.android',
-  //       'response_mode': 'form_post',
-  //       'redirect_uri':
-  //           'https://first-ossified-foe.glitch.me/callbacks/sign_in_with_apple',
-  //       'scope': 'email name',
-  //       'state': clientState,
-  //     });
-  //
-  //     final result = await FlutterWebAuth.authenticate(
-  //         url: url.toString(), callbackUrlScheme: "applink");
-  //
-  //     final body = Uri.parse(result).queryParameters;
-  //     // final oauthCredential = OAuthProvider("apple.com").credential(
-  //     //   idToken: body['id_token'],
-  //     //   accessToken: body['code'],
-  //     // );
-  //     // var data =
-  //     //     await FirebaseAuth.instance.signInWithCredential(oauthCredential);
-  //     return null;
-  //   }
-  // }
-
-  Future<UserData?> loginFb() async {
-    final LoginResult result = await FacebookAuth.i.login(
-        permissions: ["public_profile", "email"],
-        loginBehavior: LoginBehavior
-            .webOnly); // by default we request the email and the public profile
-    switch (result.status) {
-      case LoginStatus.success:
-        final AccessToken accessToken = result.accessToken!;
-        debugPrint('''
-         Logged in!
-         Token: ${accessToken.token}
-         User id: ${accessToken.userId}
-         Expires: ${accessToken.expires}
-         Permissions: ${accessToken.grantedPermissions}
-         Declined permissions: ${accessToken.declinedPermissions}
-         ''');
-
-        final userData = await FacebookAuth.instance.getUserData();
-        debugPrint(userData.toString());
-        FacebookAuth.instance.logOut();
-        appDB.user = UserData(
-            socialId: userData["id"],
-            email: userData["email"],
-            firstName: userData["name"],
-            profileImage: userData["picture"]["data"]["url"]);
-        return appDB.user;
-      case LoginStatus.cancelled:
-        debugPrint('Login cancelled by the user.');
-        errorMessage = 'Login cancelled by the user';
-        return null;
-      case LoginStatus.failed:
-        debugPrint('Something went wrong with the login process.\n'
-            'Here\'s the error Facebook gave us: ${result.message}');
-        errorMessage = 'Something went wrong';
-        return null;
-      case LoginStatus.operationInProgress:
-        errorMessage = 'Something went wrong';
-        return null;
-    }
-  }
-
-  Map<String, dynamic> parseJwt(String token) {
-    final parts = token.split('.');
-    if (parts.length != 3) {
-      throw Exception('invalid token');
-    }
-
-    final payload = _decodeBase64(parts[1]);
-    final payloadMap = json.decode(payload);
-    if (payloadMap is! Map<String, dynamic>) {
-      throw Exception('invalid payload');
-    }
-
-    debugPrint("JsonDecode:--------------------");
-    debugPrint(payload);
-    debugPrint(jsonEncode(payloadMap));
-
-    return payloadMap;
-  }
-
-  String _decodeBase64(String str) {
-    String output = str.replaceAll('-', '+').replaceAll('_', '/');
-
-    switch (output.length % 4) {
-      case 0:
-        break;
-      case 2:
-        output += '==';
-        break;
-      case 3:
-        output += '=';
-        break;
-      default:
-        throw Exception('Illegal base64url string!"');
-    }
-
-    return utf8.decode(base64Url.decode(output));
-  }
-
-  // Future<User?> signInWithGoogle() async {
-  //   await Firebase.initializeApp();
-  //   final FirebaseAuth _auth = FirebaseAuth.instance;
-  //   try {
-  //     final GoogleSignInAccount? googleSignInAccount =
-  //         await googleSignIn.signIn();
-  //     if (googleSignInAccount == null) {
-  //       return null;
-  //     }
-  //     final GoogleSignInAuthentication googleSignInAuthentication =
-  //         await googleSignInAccount.authentication;
-  //     final AuthCredential credential = GoogleAuthProvider.credential(
-  //       accessToken: googleSignInAuthentication.accessToken,
-  //       idToken: googleSignInAuthentication.idToken,
-  //     );
-
-  //     final UserCredential authResult =
-  //         await _auth.signInWithCredential(credential);
-  //     final User user = authResult.user!;
-
-  //     if (user != null) {
-  //       assert(!user.isAnonymous);
-
-  //       final User currentUser = _auth.currentUser!;
-  //       assert(user.uid == currentUser.uid);
-
-  //       debugPrint('signInWithGoogle succeeded: $user');
-  //       await googleSignIn.signOut();
-
-  //       return user;
-  //     } else {
-  //       return null;
-  //     }
-  //   } catch (error) {
-  //     debugPrint("G-SignIn error: $error");
-  //     errorMessage = error.toString();
-  //     return null;
-  //   }
-  // }
 }
 
 final authStore = locator<AuthStore>();

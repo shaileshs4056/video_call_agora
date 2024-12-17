@@ -22,7 +22,7 @@ class IndexState extends State<IndexPage> {
   /// if channel textField is validated to have error
   bool _validateError = false;
 
-  ClientRoleType? _role = ClientRoleType.clientRoleBroadcaster;
+  ClientRoleType _role = ClientRoleType.clientRoleBroadcaster;
 
   @override
   void dispose() {
@@ -70,7 +70,7 @@ class IndexState extends State<IndexPage> {
                       groupValue: _role,
                       onChanged: (ClientRoleType? value) {
                         setState(() {
-                          _role = value;
+                          _role = value!;
                         });
                       },
                     ),

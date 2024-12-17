@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../auth/store/auth_store.dart';
 // Agora details
 const appId = "2ac013422f444292914c234d228b87bb";
-const token = "007eJxTYFBUP5ze3dsYu8dV7281Y+nqWNWY9Z79lcu7csOq5hx0EFFgMEpMNjA0NjEySjMxMTGyNLI0NEk2MjZJMTKySLIwT0q6bhWZ3hDIyCCzNZiZkQECQXwehrLMlNR858ScnMy8dAYGAJbRH9s=";
+const token = "007eJxTYPBTL03XZVVac3vaiv1by1kj5m7eOPGqf/nlrq7rq98sLz+kwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UpL8jPr0hkJHhWkcQAyMUgvg8DGWZKan5zok5OZl56QwMAIXLIyc=";
 const channel = "videoCalling";
 @RoutePage()
 class VideoCallingPage extends StatefulWidget {
@@ -43,9 +43,7 @@ class _VideoCallingPageState extends State<VideoCallingPage> with WidgetsBinding
     startMonitoring();
     authStore.startMonitoring();
   }
-
   ///start monitoring internet connection
-
   void startMonitoring() {
     _subscription = Connectivity().onConnectivityChanged.listen((result) {
       if (result == ConnectivityResult.none) {
