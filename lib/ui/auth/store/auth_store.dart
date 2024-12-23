@@ -36,6 +36,11 @@ abstract class _AuthStoreBase with Store {
   int? selectedUserId = 0;
 
   @observable
+  int? selectedRemoteUserIdForFocus = null;
+
+
+
+  @observable
   bool isBluetoothHeadphoneConnected = false;
 
   @observable
@@ -121,6 +126,12 @@ abstract class _AuthStoreBase with Store {
   @action
   void setSelectedUserId(int? uid) {
     selectedUserId = uid;
+  }
+
+  // Actions to update states
+  @action
+  void setSelectedRemoteUserIdForFocus(int? uid) {
+    selectedRemoteUserIdForFocus = uid;
   }
 
   @action

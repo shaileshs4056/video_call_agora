@@ -11,12 +11,13 @@ import '../auth/store/auth_store.dart';
 
 const String appID = '2ac013422f444292914c234d228b87bb'; // Your Agora App ID
 const String token =
-    "007eJxTYLj9Wkd9wp+cB5/TDhosv290tKdo9n9LmZh+Xp5333p0ZSsVGIwSkw0MjU2MjNJMTEyMLI0sDU2SjYxNUoyMLJIszJOSNgslpjcEMjK85e5jZGSAQBCfh6EsMyU13zkxJyczL52BAQCl1CKm"; // Your Agora Token
+    "007eJxTYDA8Ffmr34QlMfDT7oAtmY85nbQDF85Qi+Rg12udtXym/GsFBqPEZANDYxMjozQTExMjSyNLQ5NkI2OTFCMjiyQL86Sk3QKp6Q2BjAwnYh4xMzJAIIjPw1CWmZKa75yYk5OZl87AAACY2SA/"; // Your Agora Token
 
 @RoutePage()
 class CallPage extends StatefulWidget {
   /// non-modifiable channel name of the page
   final String channelName;
+
 
   String? name;
 
@@ -31,14 +32,12 @@ class CallPage extends StatefulWidget {
   _CallPageState createState() => _CallPageState();
 }
 
-class _CallPageState extends State<CallPage>
-    with
+class _CallPageState extends State<CallPage> with
         TickerProviderStateMixin,
         AutomaticKeepAliveClientMixin,
         WidgetsBindingObserver {
   final Floating floating = Floating();
   late final PageController pageController;
-
   @override
   void dispose() {
     // clear users
@@ -72,15 +71,17 @@ class _CallPageState extends State<CallPage>
     );
   }
 
+  final List<Widget> listPage1 = [];
   List<Widget> _getRenderViewsForPageOne() {
-    final List<Widget> list = [];
+    listPage1.clear();
+    //final List<Widget> list = [];
     // Add local user view
-    list.add(
+    listPage1.add(
       Observer(builder: (context) {
         return GestureDetector(
           onDoubleTap: () {
-            authStore.selectUser(0); // Select local user
-            print("your id id :${authStore.userVideoStates[0]}");
+            // authStore.selectUser(0); // Select local user
+            // print("your id id :${authStore.userVideoStates[0]}");
           },
           child: (authStore.userVideoStates[0] ?? false)
               ? Observer(builder: (context) {
@@ -96,18 +97,21 @@ class _CallPageState extends State<CallPage>
                   controller: VideoViewController(
                     rtcEngine: authStore.engine,
                     canvas: VideoCanvas(uid: 0), // Local user's video canvas
-            ),
-          ),
+                  ),
+                ),
         );
       }),
     );
     // Add remote user views
     for (var uid in authStore.users.take(min(authStore.users.length, 5))) {
-      list.add(
+      listPage1.add(
         Observer(builder: (context) {
           return GestureDetector(
             onDoubleTap: () {
-              authStore.selectUser(uid); // Select remote user
+              print(
+                  "your id is 0:${authStore.userVideoStates[uid]}");
+              //authStore.selectUser(uid); // Select remote user
+              authStore.setSelectedRemoteUserIdForFocus(uid);
             },
             child: (authStore.userVideoStates[uid] ?? false)
                 ? Container(
@@ -131,21 +135,27 @@ class _CallPageState extends State<CallPage>
       );
     }
 
-    return list;
+    return listPage1;
   }
 
+  final List<Widget> listPage2 = [];
   List<Widget> _getRenderViewsForPageTwo() {
-    final List<Widget> list = [];
+    listPage2.clear();
+    //final List<Widget> list = [];
     // Remote views for each user in _users list
     if (authStore.users.length > 5)
       authStore.users.sublist(5, authStore.users.length).forEach((int uid) {
-        list.add(Observer(
+        listPage2.add(
+            Observer(
           builder: (_) {
             return GestureDetector(
               onDoubleTap: () {
-                authStore.setSelectedUserId(uid);
                 print(
-                    "your id id :${authStore.userVideoStates[uid]}"); // Select remote user using MobX action
+                    "your id is 1:${authStore.userVideoStates[uid]}"); // Select remote user using MobX action
+                //authStore.setSelectedUserId(uid);
+                authStore.setSelectedRemoteUserIdForFocus(uid);
+                print(
+                    "your id is 2:${authStore.userVideoStates[uid]}"); // Select remote user using MobX action
               },
               child: (authStore.userVideoStates[uid] ??
                       false) // Check if remote video is muted
@@ -174,7 +184,7 @@ class _CallPageState extends State<CallPage>
         ));
       });
 
-    return list;
+    return listPage2;
   }
 
   /// Video view wrapper
@@ -204,7 +214,7 @@ class _CallPageState extends State<CallPage>
     );
   }
 
-  Widget _viewRows() {
+  Widget _viewRows(){
     final views = _getRenderViewsForPageOne();
     switch (views.length) {
       case 1:
@@ -294,8 +304,6 @@ class _CallPageState extends State<CallPage>
       ),
     );
   }
-
-  /// Video layout wrapper
 
   /// Toolbar layout
   Widget _toolbar() {
@@ -422,162 +430,173 @@ class _CallPageState extends State<CallPage>
           title: Text('Agora Flutter'),
         ),
         backgroundColor: Colors.black,
-        body: Observer(
-          builder: (context) {
-            return Center(
-              child: Stack(
-                children: <Widget>[
+        body: Observer(builder: (context) {
+          return Center(
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: PageView(
+                    padEnds: false,
+                    reverse: false,
+                    physics: BouncingScrollPhysics(),
+                    onPageChanged: (value) {
+                      authStore.setCurrentPageIndex(value);
+                      pageController.animateToPage(
+                        value,
+                        duration: Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+
+                    },
+                    scrollDirection: Axis.horizontal,
+                    children: [
+// Fullscreen mode for selected user
+                      _viewRows(),
+                      _viewSecondRows(),
+                      // _viewRows(),
+                      // viewRowsFirstPage(),
+                    ],
+                    controller: pageController,
+                  ),
+                ),
+                if (authStore.selectedRemoteUserIdForFocus != null)
                   Positioned.fill(
-                    child: PageView(
-                      padEnds: false,
-                      reverse: false,
-                      physics: BouncingScrollPhysics(),
-                      onPageChanged: (value) {
-                        authStore.setCurrentPageIndex(value);
-                        pageController.animateToPage(
-                          value,
-                          duration: Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      scrollDirection: Axis.horizontal,
+                    child: Stack(
                       children: [
-                        // if (authStore.selectedUserId != null)
-                        //   Positioned.fill(
-                        //     child: GestureDetector(
-                        //       onDoubleTap: () {
-                        //           authStore.selectedUserId = null; // Reset the selected view on double-tap
-                        //       },
-                        //       child: Stack(
-                        //         children: [
-                        //           // Background: Fullscreen video for the selected user
-                        //           Center(
-                        //             child: AgoraVideoView(
-                        //               controller: authStore.selectedUserId == 0
-                        //                   ? VideoViewController(
-                        //                 rtcEngine: authStore.engine,
-                        //                 canvas: VideoCanvas(uid: 0),
-                        //               )
-                        //                   : VideoViewController.remote(
-                        //                 rtcEngine: authStore.engine,
-                        //                 canvas:
-                        //                 VideoCanvas(uid: authStore.selectedUserId!),
-                        //                 connection: RtcConnection(
-                        //                     channelId: "videoCalling"),
-                        //               ),
-                        //             ),
-                        //           ),
-                        //           // Local view: Small video window positioned in the top-left corner
-                        //           Positioned(
-                        //             top: 16, // Adjust for padding
-                        //             left: 16, // Adjust for padding
-                        //             child: GestureDetector(
-                        //                 onDoubleTap: () {
-                        //
-                        //                     authStore.selectedUserId =
-                        //                     0; // Switch to local user view on tap
-                        //                 },
-                        //                 child: authStore.selectedUserId == 0
-                        //                     ? SizedBox.shrink()
-                        //                     : Container(
-                        //                   width: 200,
-                        //                   height: 200,
-                        //                   decoration: BoxDecoration(
-                        //                     border: Border.all(
-                        //                         color: Colors.white, width: 2),
-                        //                     borderRadius:
-                        //                     BorderRadius.circular(8),
-                        //                     color: Colors.black,
-                        //                   ),
-                        //                   child: AgoraVideoView(
-                        //                     controller: VideoViewController(
-                        //                       rtcEngine: authStore.engine,
-                        //                       canvas: VideoCanvas(uid: 0),
-                        //                     ),
-                        //                   ),
-                        //                 )),
-                        //           ),
-                        //         ],
-                        //       ),
-                        //     ),
-                        //   ),
-                        _viewRows(),
-                        _viewSecondRows(),
-
-                        // _viewRows(),
-                        // viewRowsFirstPage(),
-                      ],
-                      controller: pageController,
-                    ),
-                  ),
-                  // _viewRows(),
-                  // _panel(),
-                  _toolbar(),
-                  authStore.users.length >= 6
-                      ? Positioned(
-                    top: MediaQuery.of(context).size.height /
-                        1.55, // Adjust this value to position the PageView indicator
-                    left: 0,
-                    right: 0,
-                    child: SizedBox(
-                      height: 100,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          2,
-                              (index) {
-                            return GestureDetector(
-                              onTap: () {
-                                pageController.animateToPage(
-                                  index,
-                                  duration: Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                                print("select index is ${index}");
-                              },
-                              child: Container(
-                                margin: EdgeInsets.all(5),
-                                height: 10.h,
-                                width: 10.w,
-                                decoration: BoxDecoration(
-                                  color: authStore.currentPageIndex == index
-                                      ? Colors.blue
-                                      : AppColor.greyTealColor,
-                                  shape: BoxShape.circle,
-                                  border:
-                                  Border.all(color: Colors.white, width: 2),
-                                ),
+                        // Fullscreen Agora video view
+                        Center(
+                          child: GestureDetector(
+                            onDoubleTap: () {
+                              print(
+                                  "your id is 3:${authStore.selectedUserId}");
+                              // Toggle back to grid view
+                              final index = authStore.users.indexWhere((element) => element == authStore.selectedRemoteUserIdForFocus);
+                              authStore.users[index] = authStore.selectedRemoteUserIdForFocus!;
+                              authStore.setSelectedRemoteUserIdForFocus(null);
+                            },
+                            child: AgoraVideoView(
+                              controller: VideoViewController.remote(
+                                rtcEngine: authStore.engine,
+                                canvas: VideoCanvas(
+                                    uid: authStore
+                                        .selectedRemoteUserIdForFocus!),
+                                connection:
+                                    RtcConnection(channelId: "videoCalling"),
                               ),
-                            );
-                          },
+                            ),
+                          ),
                         ),
-                      ),
+                        // Local video as a small thumbnail in fullscreen mode
+                        Positioned(
+                          top: 16, // Adjust padding as needed
+                          left: 16,
+                          child: Observer(
+                            builder: (context) {
+                              final isVideoEnabled = authStore.userVideoStates[0] ?? false;
+
+                              print("Current video status: $isVideoEnabled");
+
+                              return Container(
+                                height: 150,
+                                width: 150,
+                                color: isVideoEnabled ? Colors.transparent : Colors.black,
+                                child: isVideoEnabled
+                                    ? AgoraVideoView(
+                                  onAgoraVideoViewCreated: (viewId) async {
+                                    print("Agora VideoView created with viewId: $viewId");
+                                    // Update the local video canvas explicitly
+                                    await authStore.engine.setupLocalVideo(VideoCanvas(
+                                      uid: 0,
+                                      view: viewId,
+                                    ));
+                                    await authStore.engine.startPreview(); // Ensure preview starts
+                                  },
+                                  controller: VideoViewController(
+                                    rtcEngine: authStore.engine,
+                                    canvas: VideoCanvas(uid: 0), // Ensure this UID matches your local user
+                                  ),
+                                )
+                                    : Center(
+                                  child: Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 50.0,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  )
-                      : SizedBox.shrink(),
-                  Observer(
-                    builder: (_) => Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        padding: const EdgeInsets.all(8.0),
-                        color: Colors.black.withOpacity(0.5),
-                        child: Text(
-                          "Network Status: ${authStore.networkStatus}",
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ) ,
+                // _viewRows(),
+                // _panel(),
+                _toolbar(),
+                authStore.users.length >= 6
+                    ? Positioned(
+                        top: MediaQuery.of(context).size.height /
+                            1.55, // Adjust this value to position the PageView indicator
+                        left: 0,
+                        right: 0,
+                        child: SizedBox(
+                          height: 100,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              2,
+                              (index) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    pageController.animateToPage(
+                                      index,
+                                      duration: Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                    );
+                                    print("select index is ${index}");
+                                  },
+                                  child: Container(
+                                    margin: EdgeInsets.all(5),
+                                    height: 10.h,
+                                    width: 10.w,
+                                    decoration: BoxDecoration(
+                                      color: authStore.currentPageIndex == index
+                                          ? Colors.blue
+                                          : AppColor.greyTealColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
+                      )
+
+                    : SizedBox.shrink(),
+                Observer(
+                  builder: (_) => Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      padding: const EdgeInsets.all(8.0),
+                      color: Colors.black.withOpacity(0.5),
+                      child: Text(
+                        "Network Status: ${authStore.networkStatus}",
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ),
                   ),
-                ],
-              ),
-            );
-          }
-        ),
-
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
-
   @override
   // TODO: implement wantKeepAlive
   bool get wantKeepAlive => true;

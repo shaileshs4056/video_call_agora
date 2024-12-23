@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../auth/store/auth_store.dart';
 // Agora details
 const appId = "2ac013422f444292914c234d228b87bb";
-const token = "007eJxTYPBTL03XZVVac3vaiv1by1kj5m7eOPGqf/nlrq7rq98sLz+kwGCUmGxgaGxiZJRmYmJiZGlkaWiSbGRskmJkZJFkYZ6UpL8jPr0hkJHhWkcQAyMUgvg8DGWZKan5zok5OZl56QwMAIXLIyc=";
+const token = "007eJxTYDA8Ffmr34QlMfDT7oAtmY85nbQDF85Qi+Rg12udtXym/GsFBqPEZANDYxMjozQTExMjSyNLQ5NkI2OTFCMjiyQL86Sk3QKp6Q2BjAwnYh4xMzJAIIjPw1CWmZKa75yYk5OZl87AAACY2SA/";
 const channel = "videoCalling";
 @RoutePage()
 class VideoCallingPage extends StatefulWidget {
